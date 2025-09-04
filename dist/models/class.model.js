@@ -22,6 +22,12 @@ const ClassSchema = new mongoose_1.default.Schema({
     ],
     location: String,
     maxStudents: Number,
+    pendingStudents: [
+        {
+            type: mongoose_1.default.Schema.Types.ObjectId,
+            ref: "User",
+        }
+    ],
     students: [
         {
             type: mongoose_1.default.Schema.Types.ObjectId,

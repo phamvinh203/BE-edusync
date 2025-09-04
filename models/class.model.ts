@@ -23,12 +23,20 @@ const ClassSchema = new mongoose.Schema(
     location: String,
     maxStudents: Number,
 
+    pendingStudents: [
+      {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    }
+    ],
+
     students: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+
     
 
     createdBy: {
