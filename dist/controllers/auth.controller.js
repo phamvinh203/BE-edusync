@@ -19,7 +19,7 @@ const auth_model_1 = __importDefault(require("../models/auth.model"));
 const forgot_password_model_1 = __importDefault(require("../models/forgot-password.model"));
 const generate_1 = require("../helpers/generate");
 const sendMail_1 = require("../helpers/sendMail");
-const auth_model_2 = __importDefault(require("../models/auth.model"));
+const user_model_1 = __importDefault(require("../models/user.model"));
 const response_1 = require("../helpers/response");
 const token_1 = require("../helpers/token");
 const decodeToken_1 = require("../helpers/decodeToken");
@@ -44,7 +44,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             password: hashedPassword,
             role: safeRole,
         });
-        yield auth_model_2.default.create({
+        yield user_model_1.default.create({
             authId: authUser._id,
             username,
             email,

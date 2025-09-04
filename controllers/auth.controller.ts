@@ -5,7 +5,7 @@ import Auth from "../models/auth.model";
 import ForgotPassword from "../models/forgot-password.model";
 import { generateOTP } from "../helpers/generate";
 import { sendMail } from "../helpers/sendMail";
-import User from "../models/auth.model";
+import User from "../models/user.model";
 import { sendError, sendSuccess } from "../helpers/response";
 import { createTokens } from "../helpers/token";
 import { decodeToken } from "../helpers/decodeToken";
