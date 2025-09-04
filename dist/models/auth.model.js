@@ -10,6 +10,11 @@ const authSchema = new mongoose_1.default.Schema({
     password: String,
     access_token: String,
     refresh_token: String,
+    role: {
+        type: String,
+        enum: ["admin", "teacher", "student"],
+        default: "student",
+    },
     deleted: {
         type: Boolean,
         default: false,
@@ -18,5 +23,5 @@ const authSchema = new mongoose_1.default.Schema({
 }, {
     timestamps: true,
 });
-const User = mongoose_1.default.model("User", authSchema, "users");
-exports.default = User;
+const Auth = mongoose_1.default.model("Auth", authSchema, "auths");
+exports.default = Auth;
