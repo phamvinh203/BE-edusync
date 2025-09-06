@@ -12,8 +12,8 @@ const authSchema = new mongoose_1.default.Schema({
     refresh_token: String,
     role: {
         type: String,
-        enum: ["admin", "teacher", "student"],
-        default: "student",
+        enum: ['admin', 'teacher', 'student'],
+        default: 'student',
     },
     deleted: {
         type: Boolean,
@@ -23,5 +23,5 @@ const authSchema = new mongoose_1.default.Schema({
 }, {
     timestamps: true,
 });
-const Auth = mongoose_1.default.model("Auth", authSchema, "auths");
+const Auth = mongoose_1.default.model('Auth', authSchema, 'auths');
 exports.default = Auth;

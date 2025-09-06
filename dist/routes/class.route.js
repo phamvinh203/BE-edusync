@@ -40,7 +40,7 @@ const checkRole_1 = require("../middlewares/checkRole");
 const auth_middleware_1 = require("../middlewares/auth.middleware");
 const router = (0, express_1.Router)();
 router.post('/createclass', auth_middleware_1.authenticate, (0, checkRole_1.checkRole)(['teacher', 'admin']), controller.createClass);
-router.get('/getallclasses', controller.getAllClasses);
+router.get('/getallclasses', auth_middleware_1.authenticate, controller.getAllClasses);
 router.get('/getclass/:id', controller.getClassById);
 router.put('/updateclass/:id', auth_middleware_1.authenticate, (0, checkRole_1.checkRole)(['teacher', 'admin']), controller.updateClass);
 router.delete('/deleteclass/:id', auth_middleware_1.authenticate, (0, checkRole_1.checkRole)(['teacher', 'admin']), controller.deleteClass);

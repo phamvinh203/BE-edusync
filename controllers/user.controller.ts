@@ -27,6 +27,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
           id: authUser._id,
           email: authUser.email,
           username: authUser.username,
+          role: authUser.role,
         },
         profile: userInfo,
       },
@@ -44,7 +45,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
 export const updateMe = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.user as { email: string };
-    const { username, phone, address, avatar, dateOfBirth, gender } = req.body;
+    const { username, phone, userClass, userSchool, address, avatar, dateOfBirth, gender } = req.body;
 
     // Tìm bản ghi auth
     const authUser = await Auth.findOne({ email, deleted: false });
@@ -60,6 +61,8 @@ export const updateMe = async (req: Request, res: Response): Promise<void> => {
       // Cập nhật thông tin hiện có
       userInfo.username = username || userInfo.username;
       userInfo.phone = phone || userInfo.phone;
+      userInfo.userClass = userClass || userInfo.userClass;
+      userInfo.userSchool = userSchool || userInfo.userSchool;
       userInfo.address = address || userInfo.address;
       userInfo.avatar = avatar || userInfo.avatar;
       userInfo.dateOfBirth = dateOfBirth || userInfo.dateOfBirth;
@@ -71,6 +74,8 @@ export const updateMe = async (req: Request, res: Response): Promise<void> => {
         authId: authUser._id,
         username,
         phone,
+        userClass,
+        userSchool,
         address,
         avatar,
         dateOfBirth,
@@ -115,12 +120,6 @@ export const updateAvatar = async (
     }
 
     const file = req.file as Express.Multer.File;
-    // console.log("File received:", {
-    //   originalname: file.originalname,
-    //   mimetype: file.mimetype,
-    //   size: file.size,
-    //   hasBuffer: !!file.buffer,
-    // });
 
     // Tạo tên file unique với timestamp
     const fileName = `${Date.now()}-${file.originalname}`;
@@ -155,8 +154,6 @@ export const updateAvatar = async (
     const { data: publicUrlData } = supabase.storage
       .from("avatars")
       .getPublicUrl(filePath);
-
-    // console.log("Public URL generated:", publicUrlData.publicUrl);
 
     // Tìm và cập nhật thông tin user
     const authUser = await Auth.findOne({ email, deleted: false });

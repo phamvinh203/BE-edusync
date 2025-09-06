@@ -1,5 +1,5 @@
 // models/class.model.ts
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const ClassSchema = new mongoose.Schema(
   {
@@ -8,10 +8,10 @@ const ClassSchema = new mongoose.Schema(
     description: String,
     teacherId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
-    
+
     schedule: [
       {
         dayOfWeek: { type: String },
@@ -25,30 +25,28 @@ const ClassSchema = new mongoose.Schema(
 
     pendingStudents: [
       {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    }
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
     ],
 
     students: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: 'User',
       },
     ],
 
-    
-
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Auth",
+      ref: 'Auth',
     },
-    
+
     deleted: { type: Boolean, default: false },
     deletedAt: Date,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-const ClassModel = mongoose.model("Class", ClassSchema, "classes");
+const ClassModel = mongoose.model('Class', ClassSchema, 'classes');
 export default ClassModel;

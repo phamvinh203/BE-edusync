@@ -10,7 +10,7 @@ const ClassSchema = new mongoose_1.default.Schema({
     description: String,
     teacherId: {
         type: mongoose_1.default.Schema.Types.ObjectId,
-        ref: "User",
+        ref: 'User',
         required: true,
     },
     schedule: [
@@ -25,21 +25,21 @@ const ClassSchema = new mongoose_1.default.Schema({
     pendingStudents: [
         {
             type: mongoose_1.default.Schema.Types.ObjectId,
-            ref: "User",
-        }
+            ref: 'User',
+        },
     ],
     students: [
         {
             type: mongoose_1.default.Schema.Types.ObjectId,
-            ref: "User",
+            ref: 'User',
         },
     ],
     createdBy: {
         type: mongoose_1.default.Schema.Types.ObjectId,
-        ref: "Auth",
+        ref: 'Auth',
     },
     deleted: { type: Boolean, default: false },
     deletedAt: Date,
 }, { timestamps: true });
-const ClassModel = mongoose_1.default.model("Class", ClassSchema, "classes");
+const ClassModel = mongoose_1.default.model('Class', ClassSchema, 'classes');
 exports.default = ClassModel;

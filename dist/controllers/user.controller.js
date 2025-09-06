@@ -35,6 +35,7 @@ const getMe = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                     id: authUser._id,
                     email: authUser.email,
                     username: authUser.username,
+                    role: authUser.role,
                 },
                 profile: userInfo,
             },
@@ -52,7 +53,7 @@ exports.getMe = getMe;
 const updateMe = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email } = req.user;
-        const { username, phone, address, avatar, dateOfBirth, gender } = req.body;
+        const { username, phone, userClass, userSchool, address, avatar, dateOfBirth, gender } = req.body;
         const authUser = yield auth_model_1.default.findOne({ email, deleted: false });
         if (!authUser) {
             res.status(404).json({ message: "Người dùng không tồn tại" });
@@ -62,6 +63,8 @@ const updateMe = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (userInfo) {
             userInfo.username = username || userInfo.username;
             userInfo.phone = phone || userInfo.phone;
+            userInfo.userClass = userClass || userInfo.userClass;
+            userInfo.userSchool = userSchool || userInfo.userSchool;
             userInfo.address = address || userInfo.address;
             userInfo.avatar = avatar || userInfo.avatar;
             userInfo.dateOfBirth = dateOfBirth || userInfo.dateOfBirth;
@@ -73,6 +76,8 @@ const updateMe = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 authId: authUser._id,
                 username,
                 phone,
+                userClass,
+                userSchool,
                 address,
                 avatar,
                 dateOfBirth,

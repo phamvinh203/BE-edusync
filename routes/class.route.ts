@@ -6,7 +6,7 @@ import { authenticate } from '../middlewares/auth.middleware';
 const router: Router = Router();
 
 router.post('/createclass', authenticate, checkRole(['teacher', 'admin']), controller.createClass);
-router.get('/getallclasses', controller.getAllClasses);
+router.get('/getallclasses', authenticate, controller.getAllClasses);
 router.get('/getclass/:id', controller.getClassById);
 router.put(
   '/updateclass/:id',
@@ -34,7 +34,7 @@ router.post(
   '/:classId/approveStudent/:studentId',
   authenticate,
   checkRole(['teacher', 'admin']),
-  controller.approveStudent
+  controller.approveStudent,
 );
 
 export const classRoutes: Router = router;
