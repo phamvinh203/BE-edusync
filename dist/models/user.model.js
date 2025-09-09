@@ -7,7 +7,7 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const UserSchema = new mongoose_1.default.Schema({
     authId: {
         type: mongoose_1.default.Schema.Types.ObjectId,
-        ref: "Auth",
+        ref: 'Auth',
         required: true,
         unique: true,
     },
@@ -15,6 +15,24 @@ const UserSchema = new mongoose_1.default.Schema({
     username: String,
     phone: String,
     userClass: String,
+    registeredClasses: [
+        {
+            classId: {
+                type: mongoose_1.default.Schema.Types.ObjectId,
+                ref: 'Class',
+            },
+            status: {
+                type: String,
+                enum: ['pending', 'approved'],
+                default: 'pending',
+            },
+            registeredAt: {
+                type: Date,
+                default: Date.now,
+            },
+            approvedAt: Date,
+        },
+    ],
     userSchool: String,
     address: String,
     avatar: String,
@@ -24,8 +42,8 @@ const UserSchema = new mongoose_1.default.Schema({
     },
     gender: {
         type: String,
-        enum: ["male", "female", "other"],
-        default: "other",
+        enum: ['male', 'female', 'other'],
+        default: 'other',
     },
     deleted: {
         type: Boolean,
@@ -38,5 +56,5 @@ const UserSchema = new mongoose_1.default.Schema({
 }, {
     timestamps: true,
 });
-const User = mongoose_1.default.model("User", UserSchema, "users");
+const User = mongoose_1.default.model('User', UserSchema, 'users');
 exports.default = User;

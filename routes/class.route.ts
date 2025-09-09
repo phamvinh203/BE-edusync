@@ -37,4 +37,23 @@ router.post(
   controller.approveStudent,
 );
 
+// danh sách lớp học sinh đã đang chờ duyệt
+router.get(
+  '/my-pending-classes',
+  authenticate,
+  checkRole(['student']),
+  controller.getMyPendingClasses,
+);
+
+// danh sách lớp học sinh đã đăng ký
+router.get(
+  '/my-registered-classes',
+  authenticate,
+  checkRole(['student']),
+  controller.getMyRegisteredClasses,
+);
+
+// học sinh rời khỏi lớp học
+router.delete('/leave-class/:classId', authenticate, checkRole(['student']), controller.leaveClass);
+
 export const classRoutes: Router = router;

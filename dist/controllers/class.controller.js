@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.approveStudent = exports.getPendingStudents = exports.joinClass = exports.getStudentsByClass = exports.deleteClass = exports.updateClass = exports.getClassById = exports.getAllClasses = exports.createClass = void 0;
+exports.leaveClass = exports.getMyRegisteredClasses = exports.getMyPendingClasses = exports.approveStudent = exports.getPendingStudents = exports.joinClass = exports.getStudentsByClass = exports.deleteClass = exports.updateClass = exports.getClassById = exports.getAllClasses = exports.createClass = void 0;
 const class_model_1 = __importDefault(require("../models/class.model"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const user_model_1 = __importDefault(require("../models/user.model"));
@@ -147,7 +147,14 @@ const deleteClass = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             return res.status(403).json({ message: 'Bạn không có quyền xóa lớp học này' });
         }
         yield class_model_1.default.findByIdAndDelete(id);
-        return res.status(200).json({ message: 'Xóa lớp học thành công' });
+        return res.status(200).json({
+            message: 'Xóa lớp học thành công',
+            data: {
+                _id: foundClass._id,
+                nameClass: foundClass.nameClass,
+                subject: foundClass.subject,
+            },
+        });
     }
     catch (err) {
         return res.status(500).json({ message: 'Lỗi server', error: err });
@@ -155,12 +162,13 @@ const deleteClass = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 });
 exports.deleteClass = deleteClass;
 const getStudentsByClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { classId } = req.params;
         const user = req.user;
         const foundClass = yield class_model_1.default.findById(classId)
-            .populate('teacherId', 'username email')
-            .populate('students', 'username email');
+            .populate('teacherId', 'username email avatar')
+            .populate('students', 'username email avatar');
         if (!foundClass) {
             return res.status(404).json({ message: 'Không tìm thấy lớp học' });
         }
@@ -170,19 +178,48 @@ const getStudentsByClass = (req, res) => __awaiter(void 0, void 0, void 0, funct
         }
         const isOwnerTeacher = String(foundClass.teacherId._id) === String(currentUser._id);
         const isAdmin = user.role === 'admin';
-        const isStudentInClass = foundClass.students.some((stu) => String(stu._id) === String(currentUser._id));
-        if (!isOwnerTeacher && !isAdmin && !isStudentInClass) {
+        const isStudentInClass = foundClass.students.some((stu) => {
+            return String(stu._id) === String(currentUser._id);
+        });
+        if (user.role === 'student' && !isStudentInClass) {
             return res.status(403).json({
-                message: 'Bạn không có quyền xem danh sách học sinh lớp này',
+                message: 'Bạn không có quyền xem danh sách học sinh lớp này (chỉ học sinh trong lớp mới được xem)',
+                debug: {
+                    currentUserId: currentUser._id,
+                    userRole: user.role,
+                    isOwnerTeacher,
+                    isAdmin,
+                    isStudentInClass,
+                    studentsCount: foundClass.students.length,
+                },
+            });
+        }
+        if (user.role === 'teacher' && !isOwnerTeacher && !isAdmin) {
+            return res.status(403).json({
+                message: 'Bạn không có quyền xem danh sách học sinh lớp này (chỉ giáo viên của lớp)',
+                debug: {
+                    currentUserId: currentUser._id,
+                    userRole: user.role,
+                    isOwnerTeacher,
+                    isAdmin,
+                },
             });
         }
         return res.status(200).json({
             message: 'Danh sách học sinh trong lớp',
+            classInfo: {
+                _id: foundClass._id,
+                nameClass: foundClass.nameClass,
+                subject: foundClass.subject,
+                maxStudents: foundClass.maxStudents,
+            },
             teacher: foundClass.teacherId,
             students: foundClass.students || [],
+            totalStudents: ((_a = foundClass.students) === null || _a === void 0 ? void 0 : _a.length) || 0,
         });
     }
     catch (err) {
+        console.error('Error in getStudentsByClass:', err);
         return res.status(500).json({ message: 'Lỗi server', error: err });
     }
 });
@@ -221,6 +258,12 @@ const joinClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         foundClass.pendingStudents.push(currentUser._id);
         yield foundClass.save();
+        currentUser.registeredClasses.push({
+            classId: foundClass._id,
+            status: 'pending',
+            registeredAt: new Date(),
+        });
+        yield currentUser.save();
         return res.status(200).json({
             message: 'Đăng ký lớp thành công, vui lòng chờ giáo viên xác nhận',
             data: {
@@ -243,7 +286,7 @@ const getPendingStudents = (req, res) => __awaiter(void 0, void 0, void 0, funct
     try {
         const { classId } = req.params;
         const teacher = req.user;
-        const foundClass = yield class_model_1.default.findById(classId);
+        const foundClass = yield class_model_1.default.findById(classId).populate('pendingStudents', 'username email avatar');
         if (!foundClass) {
             return res.status(404).json({ message: 'Không tìm thấy lớp học' });
         }
@@ -257,6 +300,7 @@ const getPendingStudents = (req, res) => __awaiter(void 0, void 0, void 0, funct
         return res.status(200).json({
             message: 'Danh sách học sinh chờ xác nhận',
             data: foundClass.pendingStudents,
+            totalPending: foundClass.pendingStudents.length,
         });
     }
     catch (error) {
@@ -283,12 +327,40 @@ const approveStudent = (req, res) => __awaiter(void 0, void 0, void 0, function*
         if (!foundClass.pendingStudents.some((id) => String(id) === String(studentId))) {
             return res.status(400).json({ message: 'Học sinh không có trong danh sách chờ' });
         }
+        if (foundClass.maxStudents && foundClass.students.length >= foundClass.maxStudents) {
+            return res.status(400).json({
+                message: 'Lớp học đã đầy. Không thể duyệt thêm học sinh',
+                details: {
+                    maxStudents: foundClass.maxStudents,
+                    currentStudents: foundClass.students.length,
+                },
+            });
+        }
         foundClass.pendingStudents = foundClass.pendingStudents.filter((id) => String(id) !== String(studentId));
         foundClass.students.push(studentObjectId);
         yield foundClass.save();
+        const studentUser = yield user_model_1.default.findById(studentId);
+        if (studentUser) {
+            const registeredClass = studentUser.registeredClasses.find((rc) => String(rc.classId) === String(classId));
+            if (registeredClass) {
+                registeredClass.status = 'approved';
+                registeredClass.approvedAt = new Date();
+                yield studentUser.save();
+            }
+        }
+        const updatedClass = yield class_model_1.default.findById(classId)
+            .populate('students', 'username email avatar')
+            .populate('pendingStudents', 'username email avatar');
+        const approvedStudent = yield user_model_1.default.findById(studentId, 'username email avatar');
         return res.status(200).json({
             message: 'Xác nhận học sinh thành công',
-            data: foundClass.students,
+            approvedStudent: approvedStudent,
+            data: {
+                students: (updatedClass === null || updatedClass === void 0 ? void 0 : updatedClass.students) || [],
+                pendingStudents: (updatedClass === null || updatedClass === void 0 ? void 0 : updatedClass.pendingStudents) || [],
+                totalStudents: (updatedClass === null || updatedClass === void 0 ? void 0 : updatedClass.students.length) || 0,
+                totalPending: (updatedClass === null || updatedClass === void 0 ? void 0 : updatedClass.pendingStudents.length) || 0,
+            },
         });
     }
     catch (error) {
@@ -296,3 +368,143 @@ const approveStudent = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.approveStudent = approveStudent;
+const getMyPendingClasses = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = req.user;
+        if (!user || user.role !== 'student') {
+            return res.status(403).json({ message: 'Chỉ học sinh mới có quyền xem lớp đang chờ duyệt' });
+        }
+        const currentUser = yield user_model_1.default.findOne({ authId: user._id, deleted: false }).populate({
+            path: 'registeredClasses.classId',
+            populate: {
+                path: 'teacherId',
+                select: 'username email avatar',
+            },
+        });
+        if (!currentUser) {
+            return res.status(404).json({ message: 'Không tìm thấy thông tin người dùng' });
+        }
+        const pendingClasses = currentUser.registeredClasses.filter((regClass) => regClass.status === 'pending');
+        const formattedClasses = pendingClasses.map((regClass) => {
+            const classInfo = regClass.classId;
+            return {
+                _id: classInfo._id,
+                nameClass: classInfo.nameClass,
+                subject: classInfo.subject,
+                description: classInfo.description,
+                schedule: classInfo.schedule,
+                location: classInfo.location,
+                maxStudents: classInfo.maxStudents,
+                teacher: classInfo.teacherId,
+                registrationInfo: {
+                    registeredAt: regClass.registeredAt,
+                    status: regClass.status,
+                },
+                createdAt: classInfo.createdAt,
+                updatedAt: classInfo.updatedAt,
+            };
+        });
+        return res.status(200).json({
+            message: 'Lấy danh sách lớp đang chờ duyệt thành công',
+            data: formattedClasses,
+            totalClasses: formattedClasses.length,
+        });
+    }
+    catch (err) {
+        console.error('Error in getMyPendingClasses:', err);
+        return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+});
+exports.getMyPendingClasses = getMyPendingClasses;
+const getMyRegisteredClasses = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = req.user;
+        if (!user || user.role !== 'student') {
+            return res.status(403).json({ message: 'Chỉ học sinh mới có quyền xem lớp đã đăng ký' });
+        }
+        const currentUser = yield user_model_1.default.findOne({ authId: user._id, deleted: false }).populate({
+            path: 'registeredClasses.classId',
+            populate: {
+                path: 'teacherId',
+                select: 'username email avatar',
+            },
+        });
+        if (!currentUser) {
+            return res.status(404).json({ message: 'Không tìm thấy thông tin người dùng' });
+        }
+        const approvedClasses = currentUser.registeredClasses.filter((regClass) => regClass.status === 'approved');
+        const formattedClasses = approvedClasses.map((regClass) => {
+            const classInfo = regClass.classId;
+            return {
+                _id: classInfo._id,
+                nameClass: classInfo.nameClass,
+                subject: classInfo.subject,
+                description: classInfo.description,
+                schedule: classInfo.schedule,
+                location: classInfo.location,
+                maxStudents: classInfo.maxStudents,
+                teacher: classInfo.teacherId,
+                registrationInfo: {
+                    registeredAt: regClass.registeredAt,
+                    approvedAt: regClass.approvedAt,
+                    status: regClass.status,
+                },
+                createdAt: classInfo.createdAt,
+                updatedAt: classInfo.updatedAt,
+            };
+        });
+        return res.status(200).json({
+            message: 'Lấy danh sách lớp đã đăng ký thành công',
+            data: formattedClasses,
+            totalClasses: formattedClasses.length,
+        });
+    }
+    catch (err) {
+        console.error('Error in getMyRegisteredClasses:', err);
+        return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+});
+exports.getMyRegisteredClasses = getMyRegisteredClasses;
+const leaveClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { classId } = req.params;
+        const user = req.user;
+        const currentUser = yield user_model_1.default.findOne({ authId: user._id, deleted: false });
+        if (!currentUser) {
+            return res.status(404).json({ message: 'Không tìm thấy thông tin người dùng' });
+        }
+        const foundClass = yield class_model_1.default.findById(classId);
+        if (!foundClass) {
+            return res.status(404).json({ message: 'Không tìm thấy lớp học' });
+        }
+        const isInClass = foundClass.students.includes(currentUser._id);
+        const isPending = foundClass.pendingStudents.includes(currentUser._id);
+        if (!isInClass && !isPending) {
+            return res.status(400).json({ message: 'Bạn không có trong lớp học này' });
+        }
+        if (isInClass) {
+            foundClass.students = foundClass.students.filter((id) => String(id) !== String(currentUser._id));
+        }
+        if (isPending) {
+            foundClass.pendingStudents = foundClass.pendingStudents.filter((id) => String(id) !== String(currentUser._id));
+        }
+        yield foundClass.save();
+        const registeredClassIndex = currentUser.registeredClasses.findIndex((rc) => String(rc.classId) === String(classId));
+        if (registeredClassIndex !== -1) {
+            currentUser.registeredClasses.splice(registeredClassIndex, 1);
+        }
+        yield currentUser.save();
+        return res.status(200).json({
+            message: 'Rời khỏi lớp học thành công',
+            data: {
+                classId: foundClass._id,
+                className: foundClass.nameClass,
+                leftAt: new Date(),
+            },
+        });
+    }
+    catch (err) {
+        return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+});
+exports.leaveClass = leaveClass;
