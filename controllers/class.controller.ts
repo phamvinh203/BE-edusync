@@ -6,12 +6,20 @@ import User from '../models/user.model';
 // tạo lớp học (teacher)
 export const createClass = async (req: Request, res: Response) => {
   try {
-    const { nameClass, subject, description, schedule, location, maxStudents } = req.body;
+    const { nameClass, subject, description, schedule, location, maxStudents, gradeLevel, pricePerSession } = req.body;
     const user = req.user as any;
 
     // Chỉ giáo viên mới được tạo lớp
     if (!user || user.role !== 'teacher') {
       return res.status(403).json({ message: 'Chỉ giáo viên mới có quyền tạo lớp học' });
+    }
+
+    // Validation cơ bản cho trường mới
+    if (gradeLevel && (typeof gradeLevel !== 'string' || gradeLevel.trim() === '')) {
+      return res.status(400).json({ message: 'Cấp lớp phải là chuỗi hợp lệ' });
+    }
+    if (pricePerSession !== undefined && (typeof pricePerSession !== 'number' || pricePerSession < 0)) {
+      return res.status(400).json({ message: 'Số tiền buổi học phải là số >= 0' });
     }
 
     // Lấy user profile (trong collection users) để gán teacherId
@@ -27,6 +35,8 @@ export const createClass = async (req: Request, res: Response) => {
       schedule,
       location,
       maxStudents,
+      gradeLevel, // Thêm trường mới
+      pricePerSession, // Thêm trường mới
       teacherId: teacherUser._id, // 👈 luôn dùng user._id
       createdBy: user._id, // 👈 đây là id trong bảng auth (người tạo)
     });
@@ -443,7 +453,7 @@ export const approveStudent = async (req: Request, res: Response) => {
   }
 };
 
-// học sinh xem các lớp đã đăng ký và đang duyệt (student)
+// học sinh xem các lớp đã đăng ký và chờ duyệt (student)
 export const getMyPendingClasses = async (req: Request, res: Response) => {
   try {
     const user = req.user as any;

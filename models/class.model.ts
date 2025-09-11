@@ -12,6 +12,19 @@ const ClassSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Thêm trường mới: Cấp lớp dạy thêm (ví dụ: "Lớp 12")
+    gradeLevel: {
+      type: String, 
+      required: false, 
+    },
+
+    // Thêm trường mới: Số tiền cho 1 buổi học (VND)
+    pricePerSession: {
+      type: Number,
+      min: 0, // Không cho phép giá âm
+      required: false, 
+    },
+
     schedule: [
       {
         dayOfWeek: { type: String },
@@ -19,6 +32,8 @@ const ClassSchema = new mongoose.Schema(
         endTime: { type: String },
       },
     ],
+
+    
 
     location: String,
     maxStudents: Number,
@@ -36,6 +51,8 @@ const ClassSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+
+
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
