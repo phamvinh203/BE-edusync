@@ -18,10 +18,16 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const user_model_1 = __importDefault(require("../models/user.model"));
 const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { nameClass, subject, description, schedule, location, maxStudents } = req.body;
+        const { nameClass, subject, description, schedule, location, maxStudents, gradeLevel, pricePerSession } = req.body;
         const user = req.user;
         if (!user || user.role !== 'teacher') {
             return res.status(403).json({ message: 'Chỉ giáo viên mới có quyền tạo lớp học' });
+        }
+        if (gradeLevel && (typeof gradeLevel !== 'string' || gradeLevel.trim() === '')) {
+            return res.status(400).json({ message: 'Cấp lớp phải là chuỗi hợp lệ' });
+        }
+        if (pricePerSession !== undefined && (typeof pricePerSession !== 'number' || pricePerSession < 0)) {
+            return res.status(400).json({ message: 'Số tiền buổi học phải là số >= 0' });
         }
         const teacherUser = yield user_model_1.default.findOne({ authId: user._id, deleted: false });
         if (!teacherUser) {
@@ -34,6 +40,8 @@ const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             schedule,
             location,
             maxStudents,
+            gradeLevel,
+            pricePerSession,
             teacherId: teacherUser._id,
             createdBy: user._id,
         });

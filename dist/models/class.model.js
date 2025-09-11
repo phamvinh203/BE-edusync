@@ -13,6 +13,15 @@ const ClassSchema = new mongoose_1.default.Schema({
         ref: 'User',
         required: true,
     },
+    gradeLevel: {
+        type: String,
+        required: false,
+    },
+    pricePerSession: {
+        type: Number,
+        min: 0,
+        required: false,
+    },
     schedule: [
         {
             dayOfWeek: { type: String },

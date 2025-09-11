@@ -1,4 +1,4 @@
-import { supabase, EXERCISE_BUCKET } from '../config/db';
+import { supabase } from '../config/db';
 import { v4 as uuidv4 } from 'uuid';
 
 interface UploadResult {
@@ -62,7 +62,7 @@ export const uploadExerciseFileToSupabase = async (
 
     // Upload file lên Supabase Storage
     const { data, error } = await supabase.storage
-      .from(EXERCISE_BUCKET)
+      .from('ExerciseFile')
       .upload(filePath, file.buffer, {
         contentType: file.mimetype,
         upsert: true, // Cho phép ghi đè nếu file trùng tên
@@ -77,7 +77,7 @@ export const uploadExerciseFileToSupabase = async (
     }
 
     // Lấy public URL
-    const { data: publicData } = supabase.storage.from(EXERCISE_BUCKET).getPublicUrl(filePath);
+    const { data: publicData } = supabase.storage.from('ExerciseFile').getPublicUrl(filePath);
 
     console.log('✅ File uploaded successfully:', {
       path: data.path,
@@ -109,7 +109,7 @@ export const deleteExerciseFileFromSupabase = async (filePath: string): Promise<
 
     const fileName = pathMatch[1];
 
-    const { error } = await supabase.storage.from(EXERCISE_BUCKET).remove([fileName]);
+    const { error } = await supabase.storage.from('ExerciseFile').remove([fileName]);
 
     if (error) {
       console.error('❌ Supabase delete error:', error);

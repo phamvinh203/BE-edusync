@@ -17,6 +17,3 @@ export const supabase = createClient(
   process.env.SUPABASE_URL as string,
   process.env.SUPABASE_ANON_KEY as string,
 );
-
-// Bucket name for exercise files
-export const EXERCISE_BUCKET = 'ExerciseFile';
