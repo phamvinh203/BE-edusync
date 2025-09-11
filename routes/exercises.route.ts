@@ -50,13 +50,13 @@ router.post(
 );
 
 // sửa thông tin bài tập nếu hết hạn nộp
-// router.put('/:exerciseId/update', authenticate, checkRole(['teacher', 'admin']), controller.updateExercise);
+router.put('/:exerciseId/update', authenticate, checkRole(['teacher']), controller.updateExercise);
 
 // Xóa mềm (soft delete) bài tập
-// router.delete('/:exerciseId/delete', authenticate, checkRole(['teacher', 'admin']), controller.deleteExercise);
+// router.delete('/:exerciseId/delete', authenticate, checkRole(['teacher']), controller.deleteExercise);
 
 // Xem danh sách bài tập do giáo viên tạo
-// router.get('/my-exercises', authenticate, checkRole(['teacher', 'admin']), controller.getMyExercises);
+// router.get('/my-exercises', authenticate, checkRole(['teacher']), controller.getMyExercises);
 
 // Xem chi tiết một bài tập (full thông tin).
 // router.get('/:exerciseId', authenticate, controller.getExerciseById);

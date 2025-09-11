@@ -39,7 +39,7 @@ const AttachmentSchema = new mongoose.Schema(
     mimeType: { type: String }, // Loại file
     uploadedAt: { type: Date, default: Date.now },
   },
-  { _id: false },
+  { _id: true }, // Cho phép tạo _id cho từng attachment
 );
 
 const ExerciseSchema = new mongoose.Schema(
