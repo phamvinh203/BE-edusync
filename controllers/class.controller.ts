@@ -6,7 +6,16 @@ import User from '../models/user.model';
 // tạo lớp học (teacher)
 export const createClass = async (req: Request, res: Response) => {
   try {
-    const { nameClass, subject, description, schedule, location, maxStudents, gradeLevel, pricePerSession } = req.body;
+    const {
+      nameClass,
+      subject,
+      description,
+      schedule,
+      location,
+      maxStudents,
+      gradeLevel,
+      pricePerSession,
+    } = req.body;
     const user = req.user as any;
 
     // Chỉ giáo viên mới được tạo lớp
@@ -18,7 +27,10 @@ export const createClass = async (req: Request, res: Response) => {
     if (gradeLevel && (typeof gradeLevel !== 'string' || gradeLevel.trim() === '')) {
       return res.status(400).json({ message: 'Cấp lớp phải là chuỗi hợp lệ' });
     }
-    if (pricePerSession !== undefined && (typeof pricePerSession !== 'number' || pricePerSession < 0)) {
+    if (
+      pricePerSession !== undefined &&
+      (typeof pricePerSession !== 'number' || pricePerSession < 0)
+    ) {
       return res.status(400).json({ message: 'Số tiền buổi học phải là số >= 0' });
     }
 
@@ -37,8 +49,8 @@ export const createClass = async (req: Request, res: Response) => {
       maxStudents,
       gradeLevel, // Thêm trường mới
       pricePerSession, // Thêm trường mới
-      teacherId: teacherUser._id, // 👈 luôn dùng user._id
-      createdBy: user._id, // 👈 đây là id trong bảng auth (người tạo)
+      teacherId: teacherUser._id, // luôn dùng user._id
+      createdBy: user._id, // đây là id trong bảng auth (người tạo)
     });
 
     return res.status(201).json({ message: 'Tạo lớp học thành công', data: newClass });
@@ -116,7 +128,7 @@ export const getAllClasses = async (req: Request, res: Response) => {
 export const getClassById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const foundClass = await ClassModel.findById(id);
+    const foundClass = await ClassModel.findById(id).populate('teacherId', 'username email avatar');
     if (!foundClass) {
       return res.status(404).json({ message: 'Không tìm thấy lớp học' });
     }

@@ -50,3 +50,19 @@ export const createExerciseSchema = yup.object({
       otherwise: (schema) => schema.optional(),
     }),
 });
+
+export const submitExerciseSchema = yup.object({
+  content: yup.string().when('type', {
+    is: 'essay',
+    then: (schema) => schema.optional(),
+    otherwise: (schema) => schema.optional(),
+  }),
+  answers: yup
+    .array()
+    .of(yup.number().integer().min(0, 'Index đáp án phải >= 0'))
+    .when('type', {
+      is: 'multiple_choice',
+      then: (schema) => schema.required('Đáp án là bắt buộc cho bài tập trắc nghiệm'),
+      otherwise: (schema) => schema.optional(),
+    }),
+});

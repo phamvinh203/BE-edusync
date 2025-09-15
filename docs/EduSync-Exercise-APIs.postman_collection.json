@@ -1,0 +1,578 @@
+{
+  "info": {
+    "name": "EduSync - Exercise APIs",
+    "description": "Complete API collection for Exercise management system",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "TEACHER_TOKEN",
+      "value": ""
+    },
+    {
+      "key": "STUDENT_TOKEN",
+      "value": ""
+    },
+    {
+      "key": "CLASS_ID",
+      "value": ""
+    },
+    {
+      "key": "EXERCISE_ID",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Authentication",
+      "item": [
+        {
+          "name": "Teacher Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.tokens) {",
+                  "        pm.environment.set(\"TEACHER_TOKEN\", response.data.tokens.access_token);",
+                  "        console.log(\"Teacher token saved\");",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/auth/login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Student Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.tokens) {",
+                  "        pm.environment.set(\"STUDENT_TOKEN\", response.data.tokens.access_token);",
+                  "        console.log(\"Student token saved\");",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/auth/login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👨‍🏫 Teacher APIs",
+      "item": [
+        {
+          "name": "Create Essay Exercise",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data._id) {",
+                  "        pm.environment.set(\"EXERCISE_ID\", response.data._id);",
+                  "        console.log(\"Exercise ID saved:\", response.data._id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEACHER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Bài tập tự luận về Toán học"
+                },
+                {
+                  "key": "description",
+                  "value": "Viết bài luận về ứng dụng toán học trong đời sống"
+                },
+                {
+                  "key": "type",
+                  "value": "essay"
+                },
+                {
+                  "key": "dueDate",
+                  "value": "2025-09-20T23:59:59.000Z"
+                },
+                {
+                  "key": "maxScore",
+                  "value": "10"
+                },
+                {
+                  "key": "subject",
+                  "value": "Toán học"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/create",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "create"]
+            }
+          }
+        },
+        {
+          "name": "Create Multiple Choice Exercise",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data._id) {",
+                  "        pm.environment.set(\"EXERCISE_ID\", response.data._id);",
+                  "        console.log(\"MC Exercise ID saved:\", response.data._id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEACHER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bài tập trắc nghiệm Toán học\",\n  \"description\": \"Kiểm tra kiến thức cơ bản\",\n  \"type\": \"multiple_choice\",\n  \"dueDate\": \"2025-09-25T23:59:59.000Z\",\n  \"maxScore\": 10,\n  \"subject\": \"Toán học\",\n  \"questions\": [\n    {\n      \"question\": \"2 + 2 = ?\",\n      \"options\": [\"3\", \"4\", \"5\", \"6\"],\n      \"correctAnswers\": [1],\n      \"points\": 2,\n      \"explanation\": \"2 + 2 = 4\"\n    },\n    {\n      \"question\": \"Căn bậc hai của 16 là?\",\n      \"options\": [\"2\", \"4\", \"8\", \"16\"],\n      \"correctAnswers\": [1],\n      \"points\": 3\n    },\n    {\n      \"question\": \"5 x 3 = ?\",\n      \"options\": [\"13\", \"15\", \"18\", \"20\"],\n      \"correctAnswers\": [1],\n      \"points\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/create",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "create"]
+            }
+          }
+        },
+        {
+          "name": "Create File Upload Exercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEACHER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bài tập nộp file - Dự án cuối kỳ\",\n  \"description\": \"Nộp file báo cáo dự án cuối kỳ\",\n  \"type\": \"file_upload\",\n  \"dueDate\": \"2025-09-30T23:59:59.000Z\",\n  \"maxScore\": 20,\n  \"subject\": \"Tin học\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/create",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "create"]
+            }
+          }
+        },
+        {
+          "name": "Update Exercise",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEACHER_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bài tập đã cập nhật\",\n  \"description\": \"Mô tả mới cho bài tập\",\n  \"maxScore\": 15,\n  \"dueDate\": \"2025-09-25T23:59:59.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{EXERCISE_ID}}/update",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{EXERCISE_ID}}", "update"]
+            }
+          }
+        },
+        {
+          "name": "Delete Exercise",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEACHER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{EXERCISE_ID}}/delete",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{EXERCISE_ID}}", "delete"]
+            }
+          }
+        },
+        {
+          "name": "Get Exercises List (Teacher View)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEACHER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/classAssignments?page=1&limit=10&sortBy=createdAt&sortOrder=desc",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "classAssignments"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Exercise Detail (Teacher View)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{TEACHER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/{{EXERCISE_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "{{EXERCISE_ID}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👨‍🎓 Student APIs",
+      "item": [
+        {
+          "name": "Get Exercises List (Student View)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{STUDENT_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/class/{{CLASS_ID}}?page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "class", "{{CLASS_ID}}"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Exercise Detail (Student View)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{STUDENT_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/{{EXERCISE_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "{{EXERCISE_ID}}"]
+            }
+          }
+        },
+        {
+          "name": "Submit Essay Exercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{STUDENT_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "content",
+                  "value": "Đây là bài làm của tôi về chủ đề được giao. Tôi đã nghiên cứu kỹ và viết bài này với nhiều tham khảo từ các nguồn uy tín. Trong bài viết này, tôi sẽ trình bày các ứng dụng của toán học trong đời sống hàng ngày, từ việc tính toán đơn giản đến các ứng dụng phức tạp trong khoa học và công nghệ."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/{{EXERCISE_ID}}/student_Submit",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "{{EXERCISE_ID}}", "student_Submit"]
+            }
+          }
+        },
+        {
+          "name": "Submit Multiple Choice Exercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{STUDENT_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [1, 1, 1]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/{{EXERCISE_ID}}/student_Submit",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "{{EXERCISE_ID}}", "student_Submit"]
+            }
+          }
+        },
+        {
+          "name": "Submit File Upload Exercise",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{STUDENT_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "content",
+                  "value": "Đây là báo cáo dự án cuối kỳ của nhóm tôi. File đính kèm chứa toàn bộ source code và tài liệu thiết kế."
+                },
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/{{EXERCISE_ID}}/student_Submit",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "{{EXERCISE_ID}}", "student_Submit"]
+            }
+          }
+        },
+        {
+          "name": "Get My Submission",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{STUDENT_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{EXERCISE_ID}}/my-submission",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{EXERCISE_ID}}", "my-submission"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🚨 Error Test Cases",
+      "item": [
+        {
+          "name": "Submit Without Auth (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [1, 1, 1]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/{{EXERCISE_ID}}/student_Submit",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "{{EXERCISE_ID}}", "student_Submit"]
+            }
+          }
+        },
+        {
+          "name": "Submit Duplicate (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{STUDENT_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [1, 1, 1]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/{{EXERCISE_ID}}/student_Submit",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "{{EXERCISE_ID}}", "student_Submit"]
+            }
+          }
+        },
+        {
+          "name": "Access Wrong Class (403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{STUDENT_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/class/invalid_class_id",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "class", "invalid_class_id"]
+            }
+          }
+        },
+        {
+          "name": "Submit Incomplete MC (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{STUDENT_TOKEN}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [1, 1]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/exercises/{{CLASS_ID}}/{{EXERCISE_ID}}/student_Submit",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "exercises", "{{CLASS_ID}}", "{{EXERCISE_ID}}", "student_Submit"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

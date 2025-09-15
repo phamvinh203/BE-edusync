@@ -10,7 +10,7 @@ const SubmissionSchema = new mongoose.Schema(
     grade: { type: Number, min: 0 }, // điểm số
     feedback: { type: String }, // nhận xét của giáo viên
   },
-  { _id: false },
+  { _id: true }, // Cho phép tự động tạo _id cho submission
 );
 
 const QuestionSchema = new mongoose.Schema(
