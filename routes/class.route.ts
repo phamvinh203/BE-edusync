@@ -56,4 +56,10 @@ router.get(
 // học sinh rời khỏi lớp học
 router.delete('/leave-class/:classId', authenticate, checkRole(['student']), controller.leaveClass);
 
+// lấy thông tin thời gian học của tất cả lớp
+router.get('/schedules', authenticate, controller.getAllClassSchedules);
+
+// lấy thông tin thời gian học của một lớp cụ thể
+router.get('/schedule/:classId', authenticate, controller.getClassScheduleById);
+
 export const classRoutes: Router = router;

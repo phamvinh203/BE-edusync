@@ -18,7 +18,7 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const user_model_1 = __importDefault(require("../models/user.model"));
 const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { nameClass, subject, description, schedule, location, maxStudents, gradeLevel, pricePerSession } = req.body;
+        const { nameClass, subject, description, schedule, location, maxStudents, gradeLevel, pricePerSession, } = req.body;
         const user = req.user;
         if (!user || user.role !== 'teacher') {
             return res.status(403).json({ message: 'Chỉ giáo viên mới có quyền tạo lớp học' });
@@ -26,7 +26,8 @@ const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (gradeLevel && (typeof gradeLevel !== 'string' || gradeLevel.trim() === '')) {
             return res.status(400).json({ message: 'Cấp lớp phải là chuỗi hợp lệ' });
         }
-        if (pricePerSession !== undefined && (typeof pricePerSession !== 'number' || pricePerSession < 0)) {
+        if (pricePerSession !== undefined &&
+            (typeof pricePerSession !== 'number' || pricePerSession < 0)) {
             return res.status(400).json({ message: 'Số tiền buổi học phải là số >= 0' });
         }
         const teacherUser = yield user_model_1.default.findOne({ authId: user._id, deleted: false });
@@ -102,7 +103,7 @@ exports.getAllClasses = getAllClasses;
 const getClassById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const foundClass = yield class_model_1.default.findById(id);
+        const foundClass = yield class_model_1.default.findById(id).populate('teacherId', 'username email avatar');
         if (!foundClass) {
             return res.status(404).json({ message: 'Không tìm thấy lớp học' });
         }

@@ -645,3 +645,223 @@ export const leaveClass = async (req: Request, res: Response) => {
     return res.status(500).json({ message: 'Lỗi server', error: err });
   }
 };
+
+// lấy thông tin thời gian học của tất cả các lớp
+export const getAllClassSchedules = async (req: Request, res: Response) => {
+  try {
+    const user = req.user as any;
+
+    // Kiểm tra user có tồn tại không
+    if (!user) {
+      return res.status(401).json({ message: 'Người dùng chưa được xác thực' });
+    }
+
+    // Lấy thông tin user hiện tại
+    const currentUser = await User.findOne({ authId: user._id, deleted: false });
+    if (!currentUser) {
+      return res.status(404).json({ message: 'Không tìm thấy thông tin người dùng' });
+    }
+
+    let classesWithSchedule: any[] = [];
+    let message = '';
+
+    // Nếu là giáo viên: chỉ thấy thời gian học của các lớp do mình tạo
+    if (user.role === 'teacher') {
+      classesWithSchedule = await ClassModel.find({
+        teacherId: currentUser._id,
+        deleted: { $ne: true },
+        schedule: { $exists: true, $ne: [], $not: { $size: 0 } },
+      })
+        .populate('teacherId', 'username email avatar')
+        .select(
+          'nameClass subject schedule location',
+        );
+
+      message = 'Lấy thời gian học của các lớp do giáo viên tạo thành công';
+    }
+
+    // Nếu là học sinh: chỉ thấy thời gian học của các lớp mà mình đã được duyệt vào
+    else if (user.role === 'student') {
+      classesWithSchedule = await ClassModel.find({
+        students: currentUser._id, // lớp mà học sinh đã được duyệt vào
+        deleted: { $ne: true },
+        schedule: { $exists: true, $ne: [], $not: { $size: 0 } },
+      })
+        .populate('teacherId', 'username email avatar')
+        .select(
+          'nameClass subject schedule location gradeLevel pricePerSession teacherId createdAt',
+        );
+
+      message = 'Lấy thời gian học của các lớp học sinh đã tham gia thành công';
+    }
+
+    // Nếu là admin: thấy tất cả lớp học có thời gian học
+    else if (user.role === 'admin') {
+      classesWithSchedule = await ClassModel.find({
+        deleted: { $ne: true },
+        schedule: { $exists: true, $ne: [], $not: { $size: 0 } },
+      })
+        .populate('teacherId', 'username email avatar')
+        .select(
+          'nameClass subject schedule location gradeLevel pricePerSession teacherId createdAt',
+        );
+
+      message = 'Lấy thời gian học của tất cả lớp thành công (Admin)';
+    }
+
+    // Role không hợp lệ
+    else {
+      return res.status(403).json({
+        message: 'Bạn không có quyền truy cập',
+        userRole: user.role,
+        validRoles: ['teacher', 'student', 'admin'],
+      });
+    }
+
+    if (!classesWithSchedule || classesWithSchedule.length === 0) {
+      return res.status(200).json({
+        message: `Không có lớp học nào có thời gian học (${user.role})`,
+        data: [],
+        totalClasses: 0,
+        userRole: user.role,
+      });
+    }
+
+    // Format lại dữ liệu để dễ đọc hơn
+    const formattedSchedules = classesWithSchedule.map((classItem) => ({
+      classId: classItem._id,
+      nameClass: classItem.nameClass,
+      subject: classItem.subject,
+      gradeLevel: classItem.gradeLevel,
+      pricePerSession: classItem.pricePerSession,
+      location: classItem.location,
+      teacher: classItem.teacherId,
+      schedule: classItem.schedule.map((scheduleItem: any) => ({
+        dayOfWeek: scheduleItem.dayOfWeek,
+        startTime: scheduleItem.startTime,
+        endTime: scheduleItem.endTime,
+        duration:
+          scheduleItem.startTime && scheduleItem.endTime
+            ? `${scheduleItem.startTime} - ${scheduleItem.endTime}`
+            : 'Chưa xác định',
+        durationInMinutes:
+          scheduleItem.startTime && scheduleItem.endTime
+            ? calculateDuration(scheduleItem.startTime, scheduleItem.endTime)
+            : null,
+      })),
+      createdAt: classItem.createdAt,
+    }));
+
+    return res.status(200).json({
+      message,
+      data: formattedSchedules,
+      totalClasses: formattedSchedules.length,
+      userRole: user.role,
+      summary: {
+        totalClassesWithSchedule: formattedSchedules.length,
+        retrievedAt: new Date(),
+        accessLevel:
+          user.role === 'teacher'
+            ? 'Các lớp do giáo viên tạo'
+            : user.role === 'student'
+            ? 'Các lớp đã tham gia'
+            : 'Tất cả lớp học (Admin)',
+      },
+    });
+  } catch (err) {
+    console.error('Error in getAllClassSchedules:', err);
+    return res.status(500).json({ message: 'Lỗi server', error: err });
+  }
+};
+
+// lấy thông tin thời gian học của một lớp cụ thể
+export const getClassScheduleById = async (req: Request, res: Response) => {
+  try {
+    const { classId } = req.params;
+    const user = req.user as any;
+
+    // Kiểm tra user có tồn tại không
+    if (!user) {
+      return res.status(401).json({ message: 'Người dùng chưa được xác thực' });
+    }
+
+    const foundClass = await ClassModel.findById(classId)
+      .populate('teacherId', 'username email avatar')
+      .populate('students', 'username email avatar');
+
+    if (!foundClass) {
+      return res.status(404).json({ message: 'Không tìm thấy lớp học' });
+    }
+
+    if (!foundClass.schedule || foundClass.schedule.length === 0) {
+      return res.status(200).json({
+        message: 'Lớp học này chưa có thời gian học được thiết lập',
+        classInfo: {
+          classId: foundClass._id,
+          nameClass: foundClass.nameClass,
+          subject: foundClass.subject,
+          teacher: foundClass.teacherId,
+        },
+        schedule: [],
+        hasSchedule: false,
+      });
+    }
+
+    // Format thông tin chi tiết
+    const detailedSchedule = {
+      classId: foundClass._id,
+      nameClass: foundClass.nameClass,
+      subject: foundClass.subject,
+      description: foundClass.description,
+      gradeLevel: foundClass.gradeLevel,
+      pricePerSession: foundClass.pricePerSession,
+      location: foundClass.location,
+      maxStudents: foundClass.maxStudents,
+      currentStudents: foundClass.students.length,
+      teacher: foundClass.teacherId,
+      schedule: foundClass.schedule.map((scheduleItem: any) => ({
+        dayOfWeek: scheduleItem.dayOfWeek,
+        startTime: scheduleItem.startTime,
+        endTime: scheduleItem.endTime,
+        duration:
+          scheduleItem.startTime && scheduleItem.endTime
+            ? `${scheduleItem.startTime} - ${scheduleItem.endTime}`
+            : 'Chưa xác định',
+        // Tính toán thời gian học (đơn giản)
+        durationInMinutes:
+          scheduleItem.startTime && scheduleItem.endTime
+            ? calculateDuration(scheduleItem.startTime, scheduleItem.endTime)
+            : null,
+      })),
+      students: foundClass.students,
+      hasSchedule: true,
+      createdAt: foundClass.createdAt,
+      updatedAt: foundClass.updatedAt,
+    };
+
+    return res.status(200).json({
+      message: 'Lấy thông tin thời gian học lớp thành công',
+      data: detailedSchedule,
+    });
+  } catch (err) {
+    console.error('Error in getClassScheduleById:', err);
+    return res.status(500).json({ message: 'Lỗi server', error: err });
+  }
+};
+
+// Helper function để tính thời gian học (phút)
+const calculateDuration = (startTime: string, endTime: string): number | null => {
+  try {
+    if (!startTime || !endTime) return null;
+
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+
+    return endMinutes - startMinutes;
+  } catch {
+    return null;
+  }
+};
