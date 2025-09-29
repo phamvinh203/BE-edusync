@@ -184,6 +184,32 @@ export const getMySubmission = async (req: Request, res: Response) => {
   }
 };
 
+export const deleteSubmission = async (req: Request, res: Response) => {
+  try {
+    const { classId, exerciseId, submissionId } = req.params;
+    const user = req.user as any;
+
+    const result = await ExerciseService.deleteSubmission(
+      classId,
+      exerciseId,
+      submissionId,
+      user._id,
+    );
+
+    if (!result.success) {
+      return sendError(res, 400, result.message!);
+    }
+
+    return sendSuccess(res, {
+      message: 'Xóa bài nộp thành công',
+      data: null,
+    });
+  } catch (err) {
+    console.error('Error in deleteSubmission:', err);
+    return sendError(res, 500, 'Lỗi server khi xóa bài nộp');
+  }
+};
+
 export const getMySubmissions = async (req: Request, res: Response) => {
   try {
     const user = req.user as any;

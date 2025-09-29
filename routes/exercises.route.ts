@@ -87,6 +87,14 @@ router.post(
   controller.studentSubmitExercise,
 );
 
+// Xóa bài nộp (học sinh hủy nộp / nộp lại)
+router.delete(
+  '/:classId/:exerciseId/submissions/:submissionId',
+  authenticate,
+  checkRole(['student']),
+  controller.deleteSubmission,
+);
+
 // Cập nhật bài làm (nếu giáo viên cho phép và chưa hết hạn nộp)
 // router.put('/:exerciseId/submissions/:submissionId/update', authenticate, checkRole(['student']), controller.updateSubmission);
 

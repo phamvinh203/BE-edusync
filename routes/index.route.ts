@@ -3,6 +3,7 @@ import { authRoutes }  from "./auth.route";
 import { userRoutes } from "./user.route";
 import { classRoutes } from "./class.route";
 import { exerciseRoutes } from "./exercises.route";
+import { attendanceRoutes } from "./attendance.route";
 
 
 const mainRoutes = (app: Express): void => {
@@ -12,6 +13,7 @@ const mainRoutes = (app: Express): void => {
     app.use(`${version}/users`, userRoutes);
     app.use(`${version}/classes`, classRoutes);
     app.use(`${version}/exercises`, exerciseRoutes);
+    app.use(`${version}/attendance`, attendanceRoutes);
 
 
 }

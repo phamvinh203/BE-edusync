@@ -1575,6 +1575,106 @@ export class ExerciseService {
   }
 
   /**
+   * Xóa bài nộp của học sinh (học sinh hủy nộp / nộp lại)
+   */
+  static async deleteSubmission(
+    classId: string,
+    exerciseId: string,
+    submissionId: string,
+    authId: string,
+  ): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    try {
+      // Validate IDs format
+      const classIdValidation = ValidationService.validateObjectId(classId, 'ID lớp học');
+      if (!classIdValidation.isValid) {
+        return { success: false, message: classIdValidation.message };
+      }
+
+      const exerciseIdValidation = ValidationService.validateObjectId(exerciseId, 'ID bài tập');
+      if (!exerciseIdValidation.isValid) {
+        return { success: false, message: exerciseIdValidation.message };
+      }
+
+      const submissionIdValidation = ValidationService.validateObjectId(submissionId, 'ID bài nộp');
+      if (!submissionIdValidation.isValid) {
+        return { success: false, message: submissionIdValidation.message };
+      }
+
+      // Get student info
+      const student = await UserModel.findOne({ authId, deleted: false });
+      if (!student) {
+        return { success: false, message: 'Không tìm thấy thông tin học sinh' };
+      }
+
+      // Get exercise
+      const exercise = await ExerciseModel.findOne({
+        _id: exerciseId,
+        classId: classId,
+        deleted: { $ne: true },
+      });
+
+      if (!exercise) {
+        return { success: false, message: 'Không tìm thấy bài tập' };
+      }
+
+      // Find submission index
+      const submissionIndex = exercise.submissions.findIndex(
+        (sub: any) => String(sub._id) === String(submissionId),
+      );
+
+      if (submissionIndex === -1) {
+        return { success: false, message: 'Không tìm thấy bài nộp' };
+      }
+
+      const submission = exercise.submissions[submissionIndex];
+
+      // Ensure ownership: only student who submitted can delete their submission
+      if (String(submission.studentId) !== String(student._id)) {
+        return { success: false, message: 'Bạn không có quyền xóa bài nộp này' };
+      }
+
+      // Prevent deleting graded submissions
+      if (submission.grade !== undefined && submission.grade !== null) {
+        return { success: false, message: 'Không thể xóa bài nộp đã được chấm' };
+      }
+
+      // Optionally, prevent deleting after due date unless exercise allows resubmit (not implemented)
+      const now = new Date();
+      if (exercise.dueDate && now > new Date(exercise.dueDate)) {
+        return { success: false, message: 'Đã hết hạn nộp, không thể hủy bài nộp' };
+      }
+
+      // If submission has a fileUrl, try to delete it from storage using helper
+      if (submission.fileUrl) {
+        try {
+          // deleteExerciseFileFromSupabase accepts a file URL
+          const { deleteExerciseFileFromSupabase } = await import('../helpers/uploadFile');
+          const deleted = await deleteExerciseFileFromSupabase(submission.fileUrl);
+          if (!deleted) {
+            console.warn('Failed to delete submission file from storage:', submission.fileUrl);
+          }
+        } catch (err) {
+          console.warn('Error while deleting submission file:', err);
+        }
+      }
+
+      // Remove submission subdocument
+      exercise.submissions.splice(submissionIndex, 1);
+      exercise.updatedAt = new Date();
+
+      await exercise.save();
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error in ExerciseService.deleteSubmission:', error);
+      return { success: false, message: 'Lỗi server khi xóa bài nộp' };
+    }
+  }
+
+  /**
    * Lấy tổng quan tất cả bài tập đã tạo bởi teacher (đã chấm/chưa chấm)
    */
   static async getTeacherExercisesOverview(

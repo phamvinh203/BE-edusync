@@ -51,4 +51,7 @@ router.post('/:classId/approveStudent/:studentId', auth_middleware_1.authenticat
 router.get('/my-pending-classes', auth_middleware_1.authenticate, (0, checkRole_1.checkRole)(['student']), controller.getMyPendingClasses);
 router.get('/my-registered-classes', auth_middleware_1.authenticate, (0, checkRole_1.checkRole)(['student']), controller.getMyRegisteredClasses);
 router.delete('/leave-class/:classId', auth_middleware_1.authenticate, (0, checkRole_1.checkRole)(['student']), controller.leaveClass);
+router.get('/schedules', auth_middleware_1.authenticate, controller.getAllClassSchedules);
+router.get('/schedule/:classId', auth_middleware_1.authenticate, controller.getClassScheduleById);
+router.get('/download/:path(*)', controller.downloadFile);
 exports.classRoutes = router;

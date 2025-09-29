@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.leaveClass = exports.getMyRegisteredClasses = exports.getMyPendingClasses = exports.approveStudent = exports.getPendingStudents = exports.joinClass = exports.getStudentsByClass = exports.deleteClass = exports.updateClass = exports.getClassById = exports.getAllClasses = exports.createClass = void 0;
+exports.downloadFile = exports.getClassScheduleById = exports.getAllClassSchedules = exports.leaveClass = exports.getMyRegisteredClasses = exports.getMyPendingClasses = exports.approveStudent = exports.getPendingStudents = exports.joinClass = exports.getStudentsByClass = exports.deleteClass = exports.updateClass = exports.getClassById = exports.getAllClasses = exports.createClass = void 0;
 const class_model_1 = __importDefault(require("../models/class.model"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const user_model_1 = __importDefault(require("../models/user.model"));
@@ -517,3 +517,212 @@ const leaveClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.leaveClass = leaveClass;
+const getAllClassSchedules = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ message: 'Người dùng chưa được xác thực' });
+        }
+        const currentUser = yield user_model_1.default.findOne({ authId: user._id, deleted: false });
+        if (!currentUser) {
+            return res.status(404).json({ message: 'Không tìm thấy thông tin người dùng' });
+        }
+        let classesWithSchedule = [];
+        let message = '';
+        if (user.role === 'teacher') {
+            classesWithSchedule = yield class_model_1.default.find({
+                teacherId: currentUser._id,
+                deleted: { $ne: true },
+                schedule: { $exists: true, $ne: [], $not: { $size: 0 } },
+            })
+                .populate('teacherId', 'username email avatar')
+                .select('nameClass subject schedule location');
+            message = 'Lấy thời gian học của các lớp do giáo viên tạo thành công';
+        }
+        else if (user.role === 'student') {
+            classesWithSchedule = yield class_model_1.default.find({
+                students: currentUser._id,
+                deleted: { $ne: true },
+                schedule: { $exists: true, $ne: [], $not: { $size: 0 } },
+            })
+                .populate('teacherId', 'username email avatar')
+                .select('nameClass subject schedule location gradeLevel pricePerSession teacherId createdAt');
+            message = 'Lấy thời gian học của các lớp học sinh đã tham gia thành công';
+        }
+        else if (user.role === 'admin') {
+            classesWithSchedule = yield class_model_1.default.find({
+                deleted: { $ne: true },
+                schedule: { $exists: true, $ne: [], $not: { $size: 0 } },
+            })
+                .populate('teacherId', 'username email avatar')
+                .select('nameClass subject schedule location gradeLevel pricePerSession teacherId createdAt');
+            message = 'Lấy thời gian học của tất cả lớp thành công (Admin)';
+        }
+        else {
+            return res.status(403).json({
+                message: 'Bạn không có quyền truy cập',
+                userRole: user.role,
+                validRoles: ['teacher', 'student', 'admin'],
+            });
+        }
+        if (!classesWithSchedule || classesWithSchedule.length === 0) {
+            return res.status(200).json({
+                message: `Không có lớp học nào có thời gian học (${user.role})`,
+                data: [],
+                totalClasses: 0,
+                userRole: user.role,
+            });
+        }
+        const formattedSchedules = classesWithSchedule.map((classItem) => ({
+            classId: classItem._id,
+            nameClass: classItem.nameClass,
+            subject: classItem.subject,
+            gradeLevel: classItem.gradeLevel,
+            pricePerSession: classItem.pricePerSession,
+            location: classItem.location,
+            teacher: classItem.teacherId,
+            schedule: classItem.schedule.map((scheduleItem) => ({
+                dayOfWeek: scheduleItem.dayOfWeek,
+                startTime: scheduleItem.startTime,
+                endTime: scheduleItem.endTime,
+                duration: scheduleItem.startTime && scheduleItem.endTime
+                    ? `${scheduleItem.startTime} - ${scheduleItem.endTime}`
+                    : 'Chưa xác định',
+                durationInMinutes: scheduleItem.startTime && scheduleItem.endTime
+                    ? calculateDuration(scheduleItem.startTime, scheduleItem.endTime)
+                    : null,
+            })),
+            createdAt: classItem.createdAt,
+        }));
+        return res.status(200).json({
+            message,
+            data: formattedSchedules,
+            totalClasses: formattedSchedules.length,
+            userRole: user.role,
+            summary: {
+                totalClassesWithSchedule: formattedSchedules.length,
+                retrievedAt: new Date(),
+                accessLevel: user.role === 'teacher'
+                    ? 'Các lớp do giáo viên tạo'
+                    : user.role === 'student'
+                        ? 'Các lớp đã tham gia'
+                        : 'Tất cả lớp học (Admin)',
+            },
+        });
+    }
+    catch (err) {
+        console.error('Error in getAllClassSchedules:', err);
+        return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+});
+exports.getAllClassSchedules = getAllClassSchedules;
+const getClassScheduleById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { classId } = req.params;
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({ message: 'Người dùng chưa được xác thực' });
+        }
+        const foundClass = yield class_model_1.default.findById(classId)
+            .populate('teacherId', 'username email avatar')
+            .populate('students', 'username email avatar');
+        if (!foundClass) {
+            return res.status(404).json({ message: 'Không tìm thấy lớp học' });
+        }
+        if (!foundClass.schedule || foundClass.schedule.length === 0) {
+            return res.status(200).json({
+                message: 'Lớp học này chưa có thời gian học được thiết lập',
+                classInfo: {
+                    classId: foundClass._id,
+                    nameClass: foundClass.nameClass,
+                    subject: foundClass.subject,
+                    teacher: foundClass.teacherId,
+                },
+                schedule: [],
+                hasSchedule: false,
+            });
+        }
+        const detailedSchedule = {
+            classId: foundClass._id,
+            nameClass: foundClass.nameClass,
+            subject: foundClass.subject,
+            description: foundClass.description,
+            gradeLevel: foundClass.gradeLevel,
+            pricePerSession: foundClass.pricePerSession,
+            location: foundClass.location,
+            maxStudents: foundClass.maxStudents,
+            currentStudents: foundClass.students.length,
+            teacher: foundClass.teacherId,
+            schedule: foundClass.schedule.map((scheduleItem) => ({
+                dayOfWeek: scheduleItem.dayOfWeek,
+                startTime: scheduleItem.startTime,
+                endTime: scheduleItem.endTime,
+                duration: scheduleItem.startTime && scheduleItem.endTime
+                    ? `${scheduleItem.startTime} - ${scheduleItem.endTime}`
+                    : 'Chưa xác định',
+                durationInMinutes: scheduleItem.startTime && scheduleItem.endTime
+                    ? calculateDuration(scheduleItem.startTime, scheduleItem.endTime)
+                    : null,
+            })),
+            students: foundClass.students,
+            hasSchedule: true,
+            createdAt: foundClass.createdAt,
+            updatedAt: foundClass.updatedAt,
+        };
+        return res.status(200).json({
+            message: 'Lấy thông tin thời gian học lớp thành công',
+            data: detailedSchedule,
+        });
+    }
+    catch (err) {
+        console.error('Error in getClassScheduleById:', err);
+        return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+});
+exports.getClassScheduleById = getClassScheduleById;
+const calculateDuration = (startTime, endTime) => {
+    try {
+        if (!startTime || !endTime)
+            return null;
+        const [startHour, startMin] = startTime.split(':').map(Number);
+        const [endHour, endMin] = endTime.split(':').map(Number);
+        const startMinutes = startHour * 60 + startMin;
+        const endMinutes = endHour * 60 + endMin;
+        return endMinutes - startMinutes;
+    }
+    catch (_a) {
+        return null;
+    }
+};
+const downloadFile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        let filePath = req.params.path;
+        if (!filePath) {
+            return res.status(400).json({ message: 'Thiếu đường dẫn file' });
+        }
+        try {
+            filePath = decodeURIComponent(filePath);
+        }
+        catch (_a) {
+        }
+        filePath = filePath.replace(/^\/+/, '');
+        if (filePath.includes('..')) {
+            return res.status(400).json({ message: 'Đường dẫn không hợp lệ' });
+        }
+        const encodedPath = filePath
+            .split('/')
+            .map((seg) => encodeURIComponent(seg))
+            .join('/');
+        const fileName = filePath.split('/').pop() || 'download';
+        const supabaseBaseUrl = process.env.SUPABASE_URL;
+        if (!supabaseBaseUrl) {
+            return res.status(500).json({ message: 'Thiếu cấu hình SUPABASE_URL' });
+        }
+        const publicUrl = `${supabaseBaseUrl}/storage/v1/object/public/ExerciseFile/${encodedPath}?download=${encodeURIComponent(fileName)}`;
+        return res.redirect(302, publicUrl);
+    }
+    catch (err) {
+        return res.status(500).json({ message: 'Lỗi server', error: err });
+    }
+});
+exports.downloadFile = downloadFile;
