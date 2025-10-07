@@ -62,7 +62,8 @@ router.get('/schedules', authenticate, controller.getAllClassSchedules);
 // lấy thông tin thời gian học của một lớp cụ thể
 router.get('/schedule/:classId', authenticate, controller.getClassScheduleById);
 
-
+// học sinh join lớp học bằng mã lớp (student)
+router.post('/join-by-code', authenticate, checkRole(['student']), controller.joinClassByCode);
 
 
 

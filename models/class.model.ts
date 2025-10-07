@@ -33,7 +33,7 @@ const ClassSchema = new mongoose.Schema(
       },
     ],
 
-    
+    classCode: { type: String, unique: true },  // ✅ mã lớp để join
 
     location: String,
     maxStudents: Number,

@@ -78,7 +78,7 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (!user) {
             return (0, response_1.sendError)(res, 401, "Email hoặc mật khẩu không đúng");
         }
-        const allowedRoles = ["student", "teacher"];
+        const allowedRoles = ["student", "teacher", "admin"];
         if (!allowedRoles.includes(user.role)) {
             return (0, response_1.sendError)(res, 403, `Tài khoản role '${user.role}' không được phép đăng nhập`);
         }

@@ -81,7 +81,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // 3. Kiểm tra role được phép login
-    const allowedRoles = ["student", "teacher"];
+    const allowedRoles = ["student", "teacher", "admin"];
     if (!allowedRoles.includes(user.role)) {
       return sendError(res, 403, `Tài khoản role '${user.role}' không được phép đăng nhập`);
     }

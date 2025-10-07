@@ -12,10 +12,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.downloadFile = exports.getClassScheduleById = exports.getAllClassSchedules = exports.leaveClass = exports.getMyRegisteredClasses = exports.getMyPendingClasses = exports.approveStudent = exports.getPendingStudents = exports.joinClass = exports.getStudentsByClass = exports.deleteClass = exports.updateClass = exports.getClassById = exports.getAllClasses = exports.createClass = void 0;
+exports.joinClassByCode = exports.getClassScheduleById = exports.getAllClassSchedules = exports.leaveClass = exports.getMyRegisteredClasses = exports.getMyPendingClasses = exports.approveStudent = exports.getPendingStudents = exports.joinClass = exports.getStudentsByClass = exports.deleteClass = exports.updateClass = exports.getClassById = exports.getAllClasses = exports.createClass = void 0;
 const class_model_1 = __importDefault(require("../models/class.model"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const user_model_1 = __importDefault(require("../models/user.model"));
+const response_1 = require("../helpers/response");
+const generateJoinCode_1 = require("../helpers/generateJoinCode");
 const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { nameClass, subject, description, schedule, location, maxStudents, gradeLevel, pricePerSession, } = req.body;
@@ -34,6 +36,11 @@ const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!teacherUser) {
             return res.status(404).json({ message: 'Không tìm thấy thông tin giáo viên' });
         }
+        let classCode;
+        do {
+            classCode = (0, generateJoinCode_1.generateJoinCode)(6);
+        } while (yield class_model_1.default.findOne({ classCode }));
+        const joinLink = `/join/class/${classCode}`;
         const newClass = yield class_model_1.default.create({
             nameClass,
             subject,
@@ -43,6 +50,8 @@ const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             maxStudents,
             gradeLevel,
             pricePerSession,
+            classCode,
+            joinLink,
             teacherId: teacherUser._id,
             createdBy: user._id,
         });
@@ -694,35 +703,85 @@ const calculateDuration = (startTime, endTime) => {
         return null;
     }
 };
-const downloadFile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const joinClassByCode = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let filePath = req.params.path;
-        if (!filePath) {
-            return res.status(400).json({ message: 'Thiếu đường dẫn file' });
+        const { joinCode, classCode } = req.body;
+        const user = req.user;
+        const rawCode = (classCode || joinCode);
+        if (!rawCode || !rawCode.trim()) {
+            (0, response_1.sendError)(res, 400, 'Vui lòng nhập mã lớp');
+            return;
         }
-        try {
-            filePath = decodeURIComponent(filePath);
+        const normalizedCode = rawCode.trim().toUpperCase();
+        const classDoc = yield class_model_1.default.findOne({
+            classCode: normalizedCode,
+            deleted: { $ne: true },
+        });
+        if (!classDoc) {
+            (0, response_1.sendError)(res, 404, 'Không tìm thấy lớp học với mã này');
+            return;
         }
-        catch (_a) {
+        classDoc.students = classDoc.students || [];
+        classDoc.pendingStudents = classDoc.pendingStudents || [];
+        const currentUser = yield user_model_1.default.findOne({ authId: user._id, deleted: false });
+        if (!currentUser) {
+            (0, response_1.sendError)(res, 404, 'Không tìm thấy thông tin người dùng');
+            return;
         }
-        filePath = filePath.replace(/^\/+/, '');
-        if (filePath.includes('..')) {
-            return res.status(400).json({ message: 'Đường dẫn không hợp lệ' });
+        currentUser.registeredClasses = currentUser.registeredClasses || [];
+        if (String(classDoc.teacherId) === String(currentUser._id)) {
+            (0, response_1.sendError)(res, 400, 'Bạn không thể tham gia lớp do mình tạo');
+            return;
         }
-        const encodedPath = filePath
-            .split('/')
-            .map((seg) => encodeURIComponent(seg))
-            .join('/');
-        const fileName = filePath.split('/').pop() || 'download';
-        const supabaseBaseUrl = process.env.SUPABASE_URL;
-        if (!supabaseBaseUrl) {
-            return res.status(500).json({ message: 'Thiếu cấu hình SUPABASE_URL' });
+        if (classDoc.students.some((studentId) => String(studentId) === String(currentUser._id))) {
+            (0, response_1.sendError)(res, 400, 'Bạn đã tham gia lớp này rồi');
+            return;
         }
-        const publicUrl = `${supabaseBaseUrl}/storage/v1/object/public/ExerciseFile/${encodedPath}?download=${encodeURIComponent(fileName)}`;
-        return res.redirect(302, publicUrl);
+        if (classDoc.pendingStudents.some((pendingId) => String(pendingId) === String(currentUser._id))) {
+            (0, response_1.sendError)(res, 400, 'Bạn đã gửi yêu cầu tham gia lớp này');
+            return;
+        }
+        const totalStudents = classDoc.students.length;
+        if (classDoc.maxStudents && totalStudents >= classDoc.maxStudents) {
+            (0, response_1.sendError)(res, 400, 'Lớp học đã đầy. Không thể đăng ký thêm');
+            return;
+        }
+        classDoc.students.push(currentUser._id);
+        classDoc.pendingStudents = classDoc.pendingStudents.filter((pendingId) => String(pendingId) !== String(currentUser._id));
+        yield classDoc.save();
+        const joinedAt = new Date();
+        const existingRegistration = currentUser.registeredClasses.find((reg) => String(reg.classId) === String(classDoc._id));
+        if (existingRegistration) {
+            existingRegistration.status = 'approved';
+            existingRegistration.approvedAt = joinedAt;
+            existingRegistration.registeredAt = existingRegistration.registeredAt || joinedAt;
+        }
+        else {
+            currentUser.registeredClasses.push({
+                classId: classDoc._id,
+                status: 'approved',
+                registeredAt: joinedAt,
+                approvedAt: joinedAt,
+            });
+        }
+        yield currentUser.save();
+        (0, response_1.sendSuccess)(res, {
+            success: true,
+            message: 'Tham gia lớp học thành công',
+            data: {
+                classId: classDoc._id,
+                className: classDoc.nameClass,
+                subject: classDoc.subject,
+                teacherId: classDoc.teacherId,
+                status: 'approved',
+                registeredAt: joinedAt,
+                classCode: classDoc.classCode,
+            },
+        });
     }
-    catch (err) {
-        return res.status(500).json({ message: 'Lỗi server', error: err });
+    catch (error) {
+        console.error('Error in joinClassByCode:', error);
+        (0, response_1.sendError)(res, 500, 'Lỗi server khi tham gia lớp');
     }
 });
-exports.downloadFile = downloadFile;
+exports.joinClassByCode = joinClassByCode;

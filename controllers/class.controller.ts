@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import ClassModel from '../models/class.model';
 import mongoose from 'mongoose';
 import User from '../models/user.model';
+import { sendError, sendSuccess } from '../helpers/response';
+import { generateJoinCode } from '../helpers/generateJoinCode';
 
 // tạo lớp học (teacher)
 export const createClass = async (req: Request, res: Response) => {
@@ -40,6 +42,13 @@ export const createClass = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Không tìm thấy thông tin giáo viên' });
     }
 
+    let classCode: string;
+    do {
+      classCode = generateJoinCode(6);
+    } while (await ClassModel.findOne({ classCode }));
+
+    const joinLink = `/join/class/${classCode}`;
+
     const newClass = await ClassModel.create({
       nameClass,
       subject,
@@ -49,6 +58,8 @@ export const createClass = async (req: Request, res: Response) => {
       maxStudents,
       gradeLevel, // Thêm trường mới
       pricePerSession, // Thêm trường mới
+      classCode,
+      joinLink,
       teacherId: teacherUser._id, // luôn dùng user._id
       createdBy: user._id, // đây là id trong bảng auth (người tạo)
     });
@@ -673,9 +684,7 @@ export const getAllClassSchedules = async (req: Request, res: Response) => {
         schedule: { $exists: true, $ne: [], $not: { $size: 0 } },
       })
         .populate('teacherId', 'username email avatar')
-        .select(
-          'nameClass subject schedule location',
-        );
+        .select('nameClass subject schedule location');
 
       message = 'Lấy thời gian học của các lớp do giáo viên tạo thành công';
     }
@@ -863,5 +872,115 @@ const calculateDuration = (startTime: string, endTime: string): number | null =>
     return endMinutes - startMinutes;
   } catch {
     return null;
+  }
+};
+
+// học sinh join lớp học bằng mã lớp (student)
+export const joinClassByCode = async (req: Request, res: Response) => {
+  try {
+    const { joinCode, classCode } = req.body;
+    const user = req.user as any;
+
+    const rawCode = (classCode || joinCode) as string | undefined;
+
+    if (!rawCode || !rawCode.trim()) {
+      sendError(res, 400, 'Vui lòng nhập mã lớp');
+      return;
+    }
+
+    const normalizedCode = rawCode.trim().toUpperCase();
+
+    const classDoc = await ClassModel.findOne({
+      classCode: normalizedCode,
+      deleted: { $ne: true },
+    });
+
+    if (!classDoc) {
+      sendError(res, 404, 'Không tìm thấy lớp học với mã này');
+      return;
+    }
+
+    classDoc.students = classDoc.students || [];
+    classDoc.pendingStudents = classDoc.pendingStudents || [];
+
+    const currentUser = await User.findOne({ authId: user._id, deleted: false });
+    if (!currentUser) {
+      sendError(res, 404, 'Không tìm thấy thông tin người dùng');
+      return;
+    }
+
+    currentUser.registeredClasses = currentUser.registeredClasses || [];
+
+    if (String(classDoc.teacherId) === String(currentUser._id)) {
+      sendError(res, 400, 'Bạn không thể tham gia lớp do mình tạo');
+      return;
+    }
+
+    if (
+      classDoc.students.some(
+        (studentId: mongoose.Types.ObjectId) => String(studentId) === String(currentUser._id),
+      )
+    ) {
+      sendError(res, 400, 'Bạn đã tham gia lớp này rồi');
+      return;
+    }
+
+    if (
+      classDoc.pendingStudents.some(
+        (pendingId: mongoose.Types.ObjectId) => String(pendingId) === String(currentUser._id),
+      )
+    ) {
+      sendError(res, 400, 'Bạn đã gửi yêu cầu tham gia lớp này');
+      return;
+    }
+
+    const totalStudents = classDoc.students.length;
+    if (classDoc.maxStudents && totalStudents >= classDoc.maxStudents) {
+      sendError(res, 400, 'Lớp học đã đầy. Không thể đăng ký thêm');
+      return;
+    }
+
+    classDoc.students.push(currentUser._id);
+    classDoc.pendingStudents = classDoc.pendingStudents.filter(
+      (pendingId: mongoose.Types.ObjectId) => String(pendingId) !== String(currentUser._id),
+    );
+    await classDoc.save();
+
+    const joinedAt = new Date();
+
+    const existingRegistration = currentUser.registeredClasses.find(
+      (reg: any) => String(reg.classId) === String(classDoc._id),
+    );
+
+    if (existingRegistration) {
+      existingRegistration.status = 'approved';
+      existingRegistration.approvedAt = joinedAt;
+      existingRegistration.registeredAt = existingRegistration.registeredAt || joinedAt;
+    } else {
+      currentUser.registeredClasses.push({
+        classId: classDoc._id,
+        status: 'approved',
+        registeredAt: joinedAt,
+        approvedAt: joinedAt,
+      } as any);
+    }
+    await currentUser.save();
+
+    sendSuccess(res, {
+      success: true,
+      message: 'Tham gia lớp học thành công',
+      data: {
+        classId: classDoc._id,
+        className: classDoc.nameClass,
+        subject: classDoc.subject,
+        teacherId: classDoc.teacherId,
+        status: 'approved',
+        registeredAt: joinedAt,
+        classCode: classDoc.classCode,
+      },
+    });
+  } catch (error) {
+    console.error('Error in joinClassByCode:', error);
+    sendError(res, 500, 'Lỗi server khi tham gia lớp');
   }
 };

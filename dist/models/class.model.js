@@ -29,6 +29,7 @@ const ClassSchema = new mongoose_1.default.Schema({
             endTime: { type: String },
         },
     ],
+    classCode: { type: String, unique: true },
     location: String,
     maxStudents: Number,
     pendingStudents: [

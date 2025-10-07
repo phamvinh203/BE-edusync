@@ -4,6 +4,7 @@ import { userRoutes } from "./user.route";
 import { classRoutes } from "./class.route";
 import { exerciseRoutes } from "./exercises.route";
 import { attendanceRoutes } from "./attendance.route";
+import { adminRoutes } from "./admin.route";
 
 
 const mainRoutes = (app: Express): void => {
@@ -14,6 +15,8 @@ const mainRoutes = (app: Express): void => {
     app.use(`${version}/classes`, classRoutes);
     app.use(`${version}/exercises`, exerciseRoutes);
     app.use(`${version}/attendance`, attendanceRoutes);
+
+    app.use(`${version}/admin`, adminRoutes);
 
 
 }
