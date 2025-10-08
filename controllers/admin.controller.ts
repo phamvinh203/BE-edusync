@@ -36,7 +36,7 @@ export const createTeacher = async (req: Request, res: Response): Promise<void> 
     });
 
     // tạo thông tin người dùng
-    await User.create({
+    const teacherProfile = await User.create({
       authId: authUser._id,
       username,
       email,
@@ -45,7 +45,23 @@ export const createTeacher = async (req: Request, res: Response): Promise<void> 
     sendSuccess(res, {
       success: true,
       message: 'Tạo tài khoản giáo viên thành công',
-      data: authUser,
+      data: {
+        teacherId: teacherProfile._id,
+        auth: {
+          _id: authUser._id,
+          username: authUser.username,
+          email: authUser.email,
+          role: authUser.role,
+          createdAt: authUser.createdAt,
+        },
+        profile: {
+          _id: teacherProfile._id,
+          authId: teacherProfile.authId,
+          username: teacherProfile.username,
+          email: teacherProfile.email,
+          createdAt: teacherProfile.createdAt,
+        },
+      },
     });
   } catch (error) {
     console.error(error);
@@ -235,7 +251,7 @@ export const getAllTeachers = async (req: Request, res: Response): Promise<void>
   }
 };
 
-// tạo lớp học cho giáo viên
+// tạo lớp học cho giáo viên từ admin
 export const createClass = async (req: Request, res: Response): Promise<void> => {
   try {
     const admin = req.user as any;
@@ -293,6 +309,7 @@ export const createClass = async (req: Request, res: Response): Promise<void> =>
     const newClass = await ClassModel.create({
       nameClass,
       subject,
+      type: 'regular',
       description,
       schedule,
       location,
@@ -306,27 +323,13 @@ export const createClass = async (req: Request, res: Response): Promise<void> =>
       students: [],
     });
 
-    const newClassObj: any = newClass.toObject();
-
     sendSuccess(res, {
       success: true,
       message: 'Tạo lớp học thành công cho giáo viên',
-      data: {
-        _id: newClassObj._id,
-        nameClass: newClassObj.nameClass,
-        subject: newClassObj.subject,
-        classCode: newClassObj.classCode,
-        joinLink: newClassObj.joinLink,
-        teacher: {
-          _id: teacherDoc._id,
-          username: teacherDoc.username,
-          email: teacherDoc.email,
-        },
-      },
+      data: newClass,
     });
   } catch (error) {
     console.error('Error in createClass:', error);
     sendError(res, 500, 'Lỗi server khi tạo lớp học');
   }
 };
-

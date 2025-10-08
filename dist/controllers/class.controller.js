@@ -17,7 +17,6 @@ const class_model_1 = __importDefault(require("../models/class.model"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const user_model_1 = __importDefault(require("../models/user.model"));
 const response_1 = require("../helpers/response");
-const generateJoinCode_1 = require("../helpers/generateJoinCode");
 const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { nameClass, subject, description, schedule, location, maxStudents, gradeLevel, pricePerSession, } = req.body;
@@ -36,26 +35,34 @@ const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!teacherUser) {
             return res.status(404).json({ message: 'Không tìm thấy thông tin giáo viên' });
         }
-        let classCode;
-        do {
-            classCode = (0, generateJoinCode_1.generateJoinCode)(6);
-        } while (yield class_model_1.default.findOne({ classCode }));
-        const joinLink = `/join/class/${classCode}`;
         const newClass = yield class_model_1.default.create({
             nameClass,
             subject,
+            type: 'extra',
             description,
             schedule,
             location,
             maxStudents,
             gradeLevel,
             pricePerSession,
-            classCode,
-            joinLink,
             teacherId: teacherUser._id,
             createdBy: user._id,
+            pendingStudents: [],
+            students: [],
         });
-        return res.status(201).json({ message: 'Tạo lớp học thành công', data: newClass });
+        return res.status(201).json({
+            message: 'Tạo lớp học thành công',
+            data: {
+                _id: newClass._id,
+                nameClass: newClass.nameClass,
+                subject: newClass.subject,
+                teacher: {
+                    _id: teacherUser._id,
+                    username: teacherUser.username,
+                    email: teacherUser.email,
+                },
+            },
+        });
     }
     catch (err) {
         return res.status(500).json({ message: 'Lỗi server', error: err });
@@ -289,6 +296,7 @@ const joinClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 className: foundClass.nameClass,
                 subject: foundClass.subject,
                 teacherId: foundClass.teacherId,
+                type: foundClass.type,
                 status: 'pending',
                 registeredAt: new Date(),
                 position: foundClass.pendingStudents.length,
@@ -374,6 +382,7 @@ const approveStudent = (req, res) => __awaiter(void 0, void 0, void 0, function*
             message: 'Xác nhận học sinh thành công',
             approvedStudent: approvedStudent,
             data: {
+                type: 'extra',
                 students: (updatedClass === null || updatedClass === void 0 ? void 0 : updatedClass.students) || [],
                 pendingStudents: (updatedClass === null || updatedClass === void 0 ? void 0 : updatedClass.pendingStudents) || [],
                 totalStudents: (updatedClass === null || updatedClass === void 0 ? void 0 : updatedClass.students.length) || 0,
@@ -458,6 +467,7 @@ const getMyRegisteredClasses = (req, res) => __awaiter(void 0, void 0, void 0, f
                 nameClass: classInfo.nameClass,
                 subject: classInfo.subject,
                 description: classInfo.description,
+                type: classInfo.type,
                 schedule: classInfo.schedule,
                 location: classInfo.location,
                 maxStudents: classInfo.maxStudents,
@@ -773,6 +783,7 @@ const joinClassByCode = (req, res) => __awaiter(void 0, void 0, void 0, function
                 className: classDoc.nameClass,
                 subject: classDoc.subject,
                 teacherId: classDoc.teacherId,
+                type: classDoc.type,
                 status: 'approved',
                 registeredAt: joinedAt,
                 classCode: classDoc.classCode,

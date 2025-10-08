@@ -6,6 +6,11 @@ const ClassSchema = new mongoose.Schema(
     nameClass: { type: String, required: true },
     subject: { type: String, required: true },
     description: String,
+    type: {
+      type: String,
+      enum: ['extra', 'regular'],
+      default: 'extra',
+    },
     teacherId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -14,15 +19,15 @@ const ClassSchema = new mongoose.Schema(
 
     // Thêm trường mới: Cấp lớp dạy thêm (ví dụ: "Lớp 12")
     gradeLevel: {
-      type: String, 
-      required: false, 
+      type: String,
+      required: false,
     },
 
     // Thêm trường mới: Số tiền cho 1 buổi học (VND)
     pricePerSession: {
       type: Number,
       min: 0, // Không cho phép giá âm
-      required: false, 
+      required: false,
     },
 
     schedule: [
@@ -33,7 +38,7 @@ const ClassSchema = new mongoose.Schema(
       },
     ],
 
-    classCode: { type: String, unique: true },  // ✅ mã lớp để join
+    classCode: { type: String, required: false }, //  mã lớp để join
 
     location: String,
     maxStudents: Number,
@@ -51,8 +56,6 @@ const ClassSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
-
-
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
