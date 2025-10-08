@@ -42,29 +42,35 @@ export const createClass = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Không tìm thấy thông tin giáo viên' });
     }
 
-    let classCode: string;
-    do {
-      classCode = generateJoinCode(6);
-    } while (await ClassModel.findOne({ classCode }));
-
-    const joinLink = `/join/class/${classCode}`;
-
     const newClass = await ClassModel.create({
       nameClass,
       subject,
+      type: 'extra',
       description,
       schedule,
       location,
       maxStudents,
       gradeLevel, // Thêm trường mới
       pricePerSession, // Thêm trường mới
-      classCode,
-      joinLink,
       teacherId: teacherUser._id, // luôn dùng user._id
       createdBy: user._id, // đây là id trong bảng auth (người tạo)
+      classCode: generateJoinCode(8), // tạo mã lớp ngẫu nhiên
     });
 
-    return res.status(201).json({ message: 'Tạo lớp học thành công', data: newClass });
+    return res.status(201).json({
+      message: 'Tạo lớp học thành công',
+      data: {
+        _id: newClass._id,
+        nameClass: newClass.nameClass,
+        subject: newClass.subject,
+        type: newClass.type,
+        teacher: {
+          _id: teacherUser._id,
+          username: teacherUser.username,
+          email: teacherUser.email,
+        },
+      },
+    });
   } catch (err) {
     return res.status(500).json({ message: 'Lỗi server', error: err });
   }
@@ -349,6 +355,7 @@ export const joinClass = async (req: Request, res: Response) => {
         className: foundClass.nameClass,
         subject: foundClass.subject,
         teacherId: foundClass.teacherId,
+        type: foundClass.type,
         status: 'pending',
         registeredAt: new Date(),
         position: foundClass.pendingStudents.length, // vị trí trong hàng đợi
@@ -465,6 +472,7 @@ export const approveStudent = async (req: Request, res: Response) => {
       message: 'Xác nhận học sinh thành công',
       approvedStudent: approvedStudent, // Thông tin học sinh vừa được duyệt
       data: {
+        type: 'extra',
         students: updatedClass?.students || [], // Danh sách tất cả học sinh đã duyệt
         pendingStudents: updatedClass?.pendingStudents || [], // Danh sách học sinh còn chờ
         totalStudents: updatedClass?.students.length || 0,
@@ -572,6 +580,7 @@ export const getMyRegisteredClasses = async (req: Request, res: Response) => {
         nameClass: classInfo.nameClass,
         subject: classInfo.subject,
         description: classInfo.description,
+        type: classInfo.type,
         schedule: classInfo.schedule,
         location: classInfo.location,
         maxStudents: classInfo.maxStudents,
@@ -974,6 +983,7 @@ export const joinClassByCode = async (req: Request, res: Response) => {
         className: classDoc.nameClass,
         subject: classDoc.subject,
         teacherId: classDoc.teacherId,
+        type: classDoc.type,
         status: 'approved',
         registeredAt: joinedAt,
         classCode: classDoc.classCode,
@@ -984,3 +994,5 @@ export const joinClassByCode = async (req: Request, res: Response) => {
     sendError(res, 500, 'Lỗi server khi tham gia lớp');
   }
 };
+
+

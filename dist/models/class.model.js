@@ -8,6 +8,11 @@ const ClassSchema = new mongoose_1.default.Schema({
     nameClass: { type: String, required: true },
     subject: { type: String, required: true },
     description: String,
+    type: {
+        type: String,
+        enum: ['extra', 'regular'],
+        default: 'extra',
+    },
     teacherId: {
         type: mongoose_1.default.Schema.Types.ObjectId,
         ref: 'User',
@@ -30,6 +35,7 @@ const ClassSchema = new mongoose_1.default.Schema({
         },
     ],
     classCode: { type: String, unique: true },
+    joinLink: String,
     location: String,
     maxStudents: Number,
     pendingStudents: [

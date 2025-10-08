@@ -10,7 +10,7 @@ router.get('/getallClasses', authenticate, checkRole(['admin']), controller.getA
 router.get(
   '/classes-by-teacher/:teacherId',
   authenticate,
-  checkRole(['admin']),
+  checkRole(['admin', 'teacher']),
   controller.getClassesByTeacher,
 );
 router.get('/all-teacher', authenticate, checkRole(['admin']), controller.getAllTeachers);

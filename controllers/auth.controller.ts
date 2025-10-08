@@ -1,14 +1,14 @@
-import { Request, Response } from "express";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
-import Auth from "../models/auth.model";
-import ForgotPassword from "../models/forgot-password.model";
-import { generateOTP } from "../helpers/generate";
-import { sendMail } from "../helpers/sendMail";
-import User from "../models/user.model";
-import { sendError, sendSuccess } from "../helpers/response";
-import { createTokens } from "../helpers/token";
-import { decodeToken } from "../helpers/decodeToken";
+import { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import Auth from '../models/auth.model';
+import ForgotPassword from '../models/forgot-password.model';
+import { generateOTP } from '../helpers/generate';
+import { sendMail } from '../helpers/sendMail';
+import User from '../models/user.model';
+import { sendError, sendSuccess } from '../helpers/response';
+import { createTokens } from '../helpers/token';
+import { decodeToken } from '../helpers/decodeToken';
 
 //POST /api/auth/register
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -16,22 +16,22 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const { username, email, password, role } = req.body;
 
     if (!username || !email || !password) {
-      res.status(400).json({ message: "Vui lòng điền đầy đủ thông tin" });
+      res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin' });
       return;
     }
 
     // Kiểm tra email đã tồn tại
     const emailExit = await Auth.findOne({ email });
     if (emailExit) {
-      res.status(400).json({ message: "Email đã tồn tại" });
+      res.status(400).json({ message: 'Email đã tồn tại' });
       return;
     }
 
     // Mã hóa mật khẩu
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const allowedRoles = ["student", "teacher"];
-    const safeRole = allowedRoles.includes(role) ? role : "student";
+    const allowedRoles = ['student', 'teacher'];
+    const safeRole = allowedRoles.includes(role) ? role : 'student';
 
     const authUser = await Auth.create({
       username,
@@ -48,7 +48,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     sendSuccess(res, {
       success: true,
-      message: "Đăng ký thành công",
+      message: 'Đăng ký thành công',
       data: {
         user: {
           id: authUser._id,
@@ -60,7 +60,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     console.error(error);
-    sendError(res, 500, "Lỗi server");
+    sendError(res, 500, 'Lỗi server');
   }
 };
 
@@ -71,25 +71,25 @@ export const login = async (req: Request, res: Response) => {
 
     // 1. Validate input
     if (!email || !password) {
-      return sendError(res, 400, "Vui lòng nhập email và mật khẩu");
+      return sendError(res, 400, 'Vui lòng nhập email và mật khẩu');
     }
 
     // 2. Tìm user
     const user = await Auth.findOne({ email });
     if (!user) {
-      return sendError(res, 401, "Email hoặc mật khẩu không đúng");
+      return sendError(res, 401, 'Email hoặc mật khẩu không đúng');
     }
 
     // 3. Kiểm tra role được phép login
-    const allowedRoles = ["student", "teacher", "admin"];
+    const allowedRoles = ['student', 'teacher', 'admin'];
     if (!allowedRoles.includes(user.role)) {
       return sendError(res, 403, `Tài khoản role '${user.role}' không được phép đăng nhập`);
     }
 
     // 4. Kiểm tra mật khẩu
-    const isPasswordValid = await bcrypt.compare(password, user.password || "");
+    const isPasswordValid = await bcrypt.compare(password, user.password || '');
     if (!isPasswordValid) {
-      return sendError(res, 401, "Email hoặc mật khẩu không đúng");
+      return sendError(res, 401, 'Email hoặc mật khẩu không đúng');
     }
 
     // 5. Tạo token
@@ -99,24 +99,40 @@ export const login = async (req: Request, res: Response) => {
     user.refresh_token = refresh_token;
     await user.save();
 
-    // 6. Trả về response chuẩn
+    // 6. Lấy thông tin teacherId nếu role là teacher
+    let teacherId = null;
+    if (user.role === 'teacher') {
+      const teacherProfile = await User.findOne({ authId: user._id });
+      if (teacherProfile) {
+        teacherId = teacherProfile._id;
+      }
+    }
+
+    // 7. Trả về response chuẩn
+    const responseData: any = {
+      access_token,
+      refresh_token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    };
+
+    // Thêm teacherId vào response nếu là teacher
+    if (teacherId) {
+      responseData.user.teacherId = teacherId;
+    }
+
     return sendSuccess(res, {
       success: true,
-      message: "Đăng nhập thành công",
-      data: {
-        access_token,
-        refresh_token,
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-        },
-      },
+      message: 'Đăng nhập thành công',
+      data: responseData,
     });
   } catch (error) {
     console.error(error);
-    return sendError(res, 500, "Lỗi server");
+    return sendError(res, 500, 'Lỗi server');
   }
 };
 
@@ -124,7 +140,7 @@ export const login = async (req: Request, res: Response) => {
 export const refreshToken = (req: Request, res: Response) => {
   const { refresh_token } = req.body;
 
-  if (!refresh_token) return sendError(res, 401, "Không có refresh token");
+  if (!refresh_token) return sendError(res, 401, 'Không có refresh token');
 
   try {
     // Xác minh refresh token
@@ -137,12 +153,12 @@ export const refreshToken = (req: Request, res: Response) => {
         email: (decoded as any).email,
       },
       process.env.JWT_SECRET!,
-      { expiresIn: "15m" }
+      { expiresIn: '15m' },
     );
 
-     sendSuccess(res, { access_token });
+    sendSuccess(res, { access_token });
   } catch (error) {
-    sendError(res, 403, "Refresh token không hợp lệ hoặc đã hết hạn");
+    sendError(res, 403, 'Refresh token không hợp lệ hoặc đã hết hạn');
   }
 };
 
@@ -152,25 +168,22 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
 
   const user = await Auth.findById(userId);
   if (user) {
-    user.refresh_token = "";
+    user.refresh_token = '';
     await user.save();
   }
 
-  sendSuccess(res, { message: "Đăng xuất thành công" });
+  sendSuccess(res, { message: 'Đăng xuất thành công' });
 };
 
 //POST /api/auth/password/forgot
-export const forgotPassword = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
   try {
     const email = req.body.email;
 
     const authUser = await Auth.findOne({ email, deleted: false });
 
     if (!authUser) {
-      sendError(res, 400, "Email không tồn tại");
+      sendError(res, 400, 'Email không tồn tại');
       return;
     }
 
@@ -187,7 +200,7 @@ export const forgotPassword = async (
     await forgotPasswordData.save();
 
     // Gửi email
-    const subject = "Mã OTP quên mật khẩu của bạn";
+    const subject = 'Mã OTP quên mật khẩu của bạn';
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.5;">
         <h2>Yêu cầu quên mật khẩu</h2>
@@ -207,31 +220,28 @@ export const forgotPassword = async (
       `;
     await sendMail(email, subject, html);
 
-    sendSuccess(res, { code: 200, message: "OTP đã được gửi đến email" });
+    sendSuccess(res, { code: 200, message: 'OTP đã được gửi đến email' });
   } catch (error) {
-    console.error("Error in forgotPassword:", error);
-    sendError(res, 500, "Lỗi server");
+    console.error('Error in forgotPassword:', error);
+    sendError(res, 500, 'Lỗi server');
   }
 };
 
 // [POST] /api/users/password/otp
-export const otpPassword = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const otpPassword = async (req: Request, res: Response): Promise<void> => {
   const { email, otp } = req.body;
 
   try {
     // Tìm OTP tương ứng
     const result = await ForgotPassword.findOne({ email, otp });
     if (!result) {
-      sendError(res, 404, "Người dùng không tồn tại");
+      sendError(res, 404, 'Người dùng không tồn tại');
       return;
     }
 
     const user = await Auth.findOne({ email });
     if (!user) {
-      res.status(404).json({ message: "Người dùng không tồn tại" });
+      res.status(404).json({ message: 'Người dùng không tồn tại' });
       return;
     }
 
@@ -241,13 +251,13 @@ export const otpPassword = async (
         userId: user._id,
         email: user.email,
       },
-      process.env.JWT_SECRET || "default_secret",
-      { expiresIn: "15m" }
+      process.env.JWT_SECRET || 'default_secret',
+      { expiresIn: '15m' },
     );
 
     sendSuccess(res, {
       code: 200,
-      message: "Xác thực OTP thành công",
+      message: 'Xác thực OTP thành công',
       access_token,
       user: {
         id: user._id,
@@ -256,29 +266,29 @@ export const otpPassword = async (
       },
     });
   } catch (error) {
-    sendError(res, 500, "Lỗi server");
+    sendError(res, 500, 'Lỗi server');
   }
 };
 
 //POST /api/auth/password/reset
 export const resetPassword = async (req: Request, res: Response): Promise<void> => {
   try {
-    const decoded = decodeToken (req.headers.authorization);
+    const decoded = decodeToken(req.headers.authorization);
     const { email } = decoded;
     const { newPassword, confirmPassword } = req.body;
 
     if (!newPassword || !confirmPassword) {
-      sendError(res, 400, "Vui lòng nhập đầy đủ mật khẩu mới");
+      sendError(res, 400, 'Vui lòng nhập đầy đủ mật khẩu mới');
       return;
     }
     if (newPassword !== confirmPassword) {
-      sendError(res, 400, "Mật khẩu xác nhận không khớp");
+      sendError(res, 400, 'Mật khẩu xác nhận không khớp');
       return;
     }
 
     const user = await Auth.findOne({ email });
     if (!user) {
-      sendError(res, 404, "Người dùng không tồn tại");
+      sendError(res, 404, 'Người dùng không tồn tại');
       return;
     }
 
@@ -286,8 +296,8 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     await user.save();
     await ForgotPassword.deleteMany({ email });
 
-    sendSuccess(res, { message: "Đổi mật khẩu thành công" });
+    sendSuccess(res, { message: 'Đổi mật khẩu thành công' });
   } catch (error) {
-    sendError(res, 403, "Token không hợp lệ hoặc đã hết hạn");
+    sendError(res, 403, 'Token không hợp lệ hoặc đã hết hạn');
   }
 };
