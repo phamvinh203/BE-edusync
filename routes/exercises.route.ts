@@ -102,7 +102,7 @@ router.delete(
 router.get(
   '/:classId/classAssignments',
   authenticate,
-  checkRole(['teacher', 'student']),
+  checkRole(['admin','teacher', 'student']),
   controller.getExercisesByClass,
 );
 

@@ -226,6 +226,9 @@ export const getAllTeachers = async (req: Request, res: Response): Promise<void>
       const profile = userProfiles.find((u) => u.authId.toString() === t._id.toString());
       return {
         _id: t._id,
+
+        // the teacherId is the User profile _id created in createTeacher
+        teacherId: profile?._id || null,
         username: profile?.username || t.username,
         email: t.email,
         avatar: profile?.avatar || null,
