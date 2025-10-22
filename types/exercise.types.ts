@@ -30,6 +30,7 @@ export interface Question {
 export interface AttachmentData {
   fileName: string;
   fileUrl: string;
+  filePath?: string;
   fileSize: number;
   mimeType: string;
   uploadedAt: Date;
@@ -61,5 +62,6 @@ export interface FileUploadResult {
   success: boolean;
   fileName?: string;
   fileUrl?: string;
+  filePath?: string;
   error?: string;
 }

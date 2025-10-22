@@ -1,6 +1,7 @@
 import {
   uploadExerciseFileToSupabase,
   deleteExerciseFileFromSupabase,
+  getSignedUrlFromSupabase,
 } from '../helpers/uploadFile';
 import { AttachmentData, FileUploadParams, FileUploadResult } from '../types/exercise.types';
 
@@ -30,6 +31,7 @@ export class FileService {
           attachments.push({
             fileName: uploadResult.fileName!,
             fileUrl: uploadResult.fileUrl!,
+            filePath: uploadResult.filePath,
             fileSize: file.size,
             mimeType: file.mimetype,
             uploadedAt: new Date(),
@@ -72,16 +74,16 @@ export class FileService {
       for (const fileId of removeFileIds) {
         const attachmentToRemove = exercise.attachments.id(fileId);
         if (attachmentToRemove) {
-          filesToDelete.push(attachmentToRemove.fileUrl);
+          filesToDelete.push(attachmentToRemove.filePath || attachmentToRemove.fileUrl);
           exercise.attachments.pull(fileId);
         }
       }
 
       // Xóa file từ Supabase Storage
-      for (const fileUrl of filesToDelete) {
-        const deleteSuccess = await deleteExerciseFileFromSupabase(fileUrl);
+      for (const fileIdentifier of filesToDelete) {
+        const deleteSuccess = await deleteExerciseFileFromSupabase(fileIdentifier);
         if (!deleteSuccess) {
-          console.warn(`⚠️ Failed to delete file from storage: ${fileUrl}`);
+          console.warn(`⚠️ Failed to delete file from storage: ${fileIdentifier}`);
         }
       }
 
@@ -94,5 +96,67 @@ export class FileService {
         error: 'Lỗi không xác định khi xóa files',
       };
     }
+  }
+
+  private static toPlainObject<T>(data: T): T {
+    if (!data || typeof (data as any).toObject !== 'function') {
+      return data;
+    }
+    return (data as any).toObject();
+  }
+
+  private static async getSignedUrlForExerciseAttachment(attachment: any): Promise<string | null> {
+    return getSignedUrlFromSupabase('ExerciseFile', attachment?.filePath || attachment?.fileUrl);
+  }
+
+  private static async getSignedUrlForSubmissionFile(submission: any): Promise<string | null> {
+    return getSignedUrlFromSupabase('SubmissionFile', submission?.filePath || submission?.fileUrl);
+  }
+
+  static async withSignedAttachments(attachments?: any[]): Promise<any[]> {
+    if (!attachments || attachments.length === 0) {
+      return attachments || [];
+    }
+
+    return Promise.all(
+      attachments.map(async (item) => {
+        const attachment = FileService.toPlainObject(item);
+        const signedUrl = await FileService.getSignedUrlForExerciseAttachment(attachment);
+        const { filePath, ...attachmentRest } = attachment;
+
+        return {
+          ...attachmentRest,
+          fileUrl: signedUrl ?? attachment.fileUrl,
+        };
+      }),
+    );
+  }
+
+  static async withSignedSubmission(submission: any): Promise<any> {
+    if (!submission) {
+      return submission;
+    }
+
+    const normalizedDoc = FileService.toPlainObject(submission);
+    const normalized = { ...normalizedDoc };
+    const signedUrl = await FileService.getSignedUrlForSubmissionFile(normalized);
+
+    if (signedUrl) {
+      normalized.fileUrl = signedUrl;
+    }
+
+    delete normalized.filePath;
+
+    return normalized;
+  }
+
+  static async withSignedSubmissions(submissions?: any[]): Promise<any[]> {
+    if (!submissions || submissions.length === 0) {
+      return submissions || [];
+    }
+
+    return Promise.all(
+      submissions.map((submission) => FileService.withSignedSubmission(submission)),
+    );
   }
 }

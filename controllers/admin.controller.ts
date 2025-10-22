@@ -336,3 +336,287 @@ export const createClass = async (req: Request, res: Response): Promise<void> =>
     sendError(res, 500, 'Lỗi server khi tạo lớp học');
   }
 };
+
+// 1️⃣ Lấy danh sách tất cả học sinh (mặc định sắp xếp theo thời gian tạo mới nhất)
+// GET /admin/all-students
+
+// 2️⃣ Phân trang
+// GET /admin/all-students?page=2&limit=5
+
+// 3️⃣ Tìm kiếm theo tên hoặc email
+// GET /admin/all-students?search=nguyen
+
+// 4️⃣ Sắp xếp theo tên cuối cùng (lastName)
+// GET /admin/all-students?sortBy=lastName&order=asc
+// GET /admin/all-students?sortBy=lastName&order=desc
+
+// 5️⃣ Sắp xếp theo thời gian tạo
+// GET /admin/all-students?sortBy=createdAt&order=desc (mặc định)
+
+export const getAllStudents = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { search, page = 1, limit = 10, sortBy = 'createdAt', order = 'desc' } = req.query;
+
+    const pageNumber = parseInt(page as string) || 1;
+    const limitNumber = parseInt(limit as string) || 10;
+    const skip = (pageNumber - 1) * limitNumber;
+
+    // Tạo điều kiện lọc cho tài khoản role=student
+    const authFilter: any = { role: 'student', deleted: { $ne: true } };
+
+    // Nếu admin muốn tìm theo tên hoặc email
+    if (search) {
+      const keyword = new RegExp(search as string, 'i');
+      authFilter.$or = [{ username: keyword }, { email: keyword }];
+    }
+
+    // Lấy danh sách authId của học sinh
+    const studentAuths = await Auth.find(authFilter).select('_id email role createdAt');
+    const authIds = studentAuths.map((auth) => auth._id);
+
+    // Tìm thông tin chi tiết trong collection User
+    const userFilter: any = {
+      authId: { $in: authIds },
+      deleted: { $ne: true },
+    };
+
+    // Xác định cách sắp xếp
+    let sortOption: any = {};
+    if (sortBy === 'lastName') {
+      // Sắp xếp theo tên cuối cùng (phần cuối của username)
+      sortOption = { username: order === 'asc' ? 1 : -1 };
+    } else if (sortBy === 'createdAt') {
+      sortOption = { createdAt: order === 'asc' ? 1 : -1 };
+    } else {
+      // Mặc định sắp xếp theo thời gian tạo
+      sortOption = { createdAt: -1 };
+    }
+
+    // Lấy danh sách học sinh với phân trang và sắp xếp
+    const students = await User.find(userFilter)
+      .populate('authId', 'email role createdAt')
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limitNumber);
+
+    // Đếm tổng số học sinh
+    const total = await User.countDocuments(userFilter);
+
+    // Đếm số lượng lớp học mỗi học sinh đã tham gia
+    const studentsWithClassCount = await Promise.all(
+      students.map(async (student) => {
+        // Đếm lớp đã được duyệt (approved)
+        const approvedClasses = student.registeredClasses.filter(
+          (rc: any) => rc.status === 'approved',
+        );
+
+        // Đếm lớp đang chờ duyệt (pending)
+        const pendingClasses = student.registeredClasses.filter(
+          (rc: any) => rc.status === 'pending',
+        );
+
+        // Lấy tên cuối cùng từ username
+        const nameParts = student.username?.trim().split(' ') || [];
+        const lastName = nameParts.length > 0 ? nameParts[nameParts.length - 1] : '';
+
+        return {
+          _id: student._id,
+          authId: (student.authId as any)?._id || student.authId,
+          username: student.username,
+          lastName, // Tên cuối cùng để sắp xếp
+          email: student.email,
+          phone: student.phone,
+          avatar: student.avatar,
+          userClass: student.userClass,
+          userSchool: student.userSchool,
+          address: student.address,
+          dateOfBirth: student.dateOfBirth,
+          gender: student.gender,
+          totalClassesJoined: approvedClasses.length,
+          totalClassesPending: pendingClasses.length,
+          totalRegistrations: student.registeredClasses.length,
+          createdAt: student.createdAt,
+          updatedAt: student.updatedAt,
+        };
+      }),
+    );
+
+    // Nếu sắp xếp theo lastName, sắp xếp lại mảng kết quả
+    if (sortBy === 'lastName') {
+      studentsWithClassCount.sort((a, b) => {
+        const compareResult = a.lastName.localeCompare(b.lastName, 'vi');
+        return order === 'asc' ? compareResult : -compareResult;
+      });
+    }
+
+    sendSuccess(res, {
+      success: true,
+      message: 'Lấy danh sách học sinh thành công',
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(total / limitNumber),
+      },
+      sorting: {
+        sortBy: sortBy as string,
+        order: order as string,
+      },
+      data: studentsWithClassCount,
+    });
+  } catch (error) {
+    console.error('Error in getAllStudents:', error);
+    sendError(res, 500, 'Lỗi server khi lấy danh sách học sinh');
+  }
+};
+
+// Xem chi tiết học sinh đã tham gia bao nhiêu lớp học
+// GET /admin/students/:studentId/classes
+export const getStudentClasses = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { studentId } = req.params;
+
+    if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
+      sendError(res, 400, 'studentId không hợp lệ');
+      return;
+    }
+
+    // Tìm học sinh trong collection User
+    const student: any = await User.findOne({
+      _id: studentId,
+      deleted: { $ne: true },
+    }).populate({
+      path: 'authId',
+      select: 'role email deleted',
+    });
+
+    if (!student || !student.authId || student.authId.deleted) {
+      sendError(res, 404, 'Không tìm thấy học sinh');
+      return;
+    }
+
+    if (student.authId.role !== 'student') {
+      sendError(res, 400, 'Tài khoản này không phải học sinh');
+      return;
+    }
+
+    // Lấy danh sách lớp học sinh đã tham gia (được duyệt - approved)
+    const approvedClassIds = student.registeredClasses
+      .filter((rc: any) => rc.status === 'approved')
+      .map((rc: any) => rc.classId);
+
+    const approvedClasses = await ClassModel.find({
+      _id: { $in: approvedClassIds },
+      deleted: { $ne: true },
+    })
+      .populate('teacherId', 'username email avatar')
+      .sort({ createdAt: -1 });
+
+    // Lấy danh sách lớp đang chờ duyệt (pending)
+    const pendingClassIds = student.registeredClasses
+      .filter((rc: any) => rc.status === 'pending')
+      .map((rc: any) => rc.classId);
+
+    const pendingClasses = await ClassModel.find({
+      _id: { $in: pendingClassIds },
+      deleted: { $ne: true },
+    })
+      .populate('teacherId', 'username email avatar')
+      .sort({ createdAt: -1 });
+
+    // Phân loại các lớp theo cách tham gia
+    const classesJoinedByCode: any[] = [];
+    const classesJoinedByRequest: any[] = [];
+
+    for (const classDoc of approvedClasses) {
+      const registration = student.registeredClasses.find(
+        (rc: any) => String(rc.classId) === String(classDoc._id) && rc.status === 'approved',
+      );
+
+      const classInfo = {
+        _id: classDoc._id,
+        nameClass: classDoc.nameClass,
+        subject: classDoc.subject,
+        type: classDoc.type,
+        description: classDoc.description,
+        schedule: classDoc.schedule,
+        location: classDoc.location,
+        maxStudents: classDoc.maxStudents,
+        gradeLevel: classDoc.gradeLevel,
+        pricePerSession: classDoc.pricePerSession,
+        classCode: classDoc.classCode,
+        teacher: classDoc.teacherId,
+        currentStudents: classDoc.students?.length || 0,
+        registeredAt: registration?.registeredAt,
+        approvedAt: registration?.approvedAt,
+        createdAt: classDoc.createdAt,
+      };
+
+      // Nếu registeredAt và approvedAt giống nhau hoặc rất gần nhau (< 1 giây)
+      // thì đó là join bằng code (joinClassByCode)
+      if (
+        registration?.registeredAt &&
+        registration?.approvedAt &&
+        Math.abs(
+          new Date(registration.approvedAt).getTime() -
+            new Date(registration.registeredAt).getTime(),
+        ) < 1000
+      ) {
+        classesJoinedByCode.push(classInfo);
+      } else {
+        // Ngược lại là join qua đăng ký chờ duyệt (joinClass)
+        classesJoinedByRequest.push(classInfo);
+      }
+    }
+
+    // Format thông tin lớp đang chờ duyệt
+    const pendingClassesInfo = pendingClasses.map((classDoc) => {
+      const registration = student.registeredClasses.find(
+        (rc: any) => String(rc.classId) === String(classDoc._id) && rc.status === 'pending',
+      );
+
+      return {
+        _id: classDoc._id,
+        nameClass: classDoc.nameClass,
+        subject: classDoc.subject,
+        type: classDoc.type,
+        description: classDoc.description,
+        teacher: classDoc.teacherId,
+        registeredAt: registration?.registeredAt,
+        status: 'pending',
+        createdAt: classDoc.createdAt,
+      };
+    });
+
+    sendSuccess(res, {
+      success: true,
+      message: 'Lấy thông tin lớp học của học sinh thành công',
+      student: {
+        _id: student._id,
+        username: student.username,
+        email: student.email,
+        avatar: student.avatar,
+        userClass: student.userClass,
+        userSchool: student.userSchool,
+      },
+      summary: {
+        totalClassesJoined: approvedClasses.length,
+        totalClassesPending: pendingClasses.length,
+        totalRegistrations: student.registeredClasses.length,
+        joinedByCode: classesJoinedByCode.length,
+        joinedByRequest: classesJoinedByRequest.length,
+      },
+      classes: {
+        // Các lớp đã được duyệt - join bằng mã code
+        joinedByCode: classesJoinedByCode,
+        // Các lớp đã được duyệt - join bằng đăng ký chờ duyệt
+        joinedByRequest: classesJoinedByRequest,
+        // Các lớp đang chờ duyệt
+        pending: pendingClassesInfo,
+      },
+    });
+  } catch (error) {
+    console.error('Error in getStudentClasses:', error);
+    sendError(res, 500, 'Lỗi server khi lấy thông tin lớp học của học sinh');
+  }
+};

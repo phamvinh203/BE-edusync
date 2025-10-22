@@ -103,9 +103,11 @@ export class ExerciseService {
         .populate('classId', 'nameClass subject gradeLevel')
         .populate('createdBy', 'username email');
 
+      const exerciseResponse = await enrichExerciseDocument(populatedExercise);
+
       return {
         success: true,
-        exercise: populatedExercise,
+        exercise: exerciseResponse,
       };
     } catch (error) {
       console.error('Error in ExerciseService.createExercise:', error);
@@ -231,9 +233,11 @@ export class ExerciseService {
         .populate('classId', 'nameClass subject gradeLevel')
         .populate('createdBy', 'username email');
 
+      const exerciseResponse = await enrichExerciseDocument(populatedExercise);
+
       return {
         success: true,
-        exercise: populatedExercise,
+        exercise: exerciseResponse,
       };
     } catch (error) {
       console.error('Error in ExerciseService.updateExercise:', error);
@@ -649,6 +653,7 @@ export class ExerciseService {
             submittedAt: submission.submittedAt,
             content: submission.content,
             fileUrl: submission.fileUrl,
+            filePath: submission.filePath,
             answers: submission.answers,
             grade: submission.grade,
             feedback: submission.feedback,
@@ -663,6 +668,16 @@ export class ExerciseService {
           (new Date(exercise.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24),
         ),
       };
+
+      const attachmentsWithSigned = await FileService.withSignedAttachments(
+        (formattedExercise.attachments as any[]) || [],
+      );
+      (formattedExercise as any).attachments = attachmentsWithSigned;
+
+      const submissionsWithSigned = await FileService.withSignedSubmissions(
+        (formattedExercise.submissions as any[]) || [],
+      );
+      (formattedExercise as any).submissions = submissionsWithSigned;
 
       return {
         success: true,
@@ -781,10 +796,14 @@ export class ExerciseService {
 
         submissionContent.content = submissionData.content || '';
 
-        // Handle file upload for essay
+        // Handle file upload for essay - use SubmissionFile bucket
         if (files && files.length > 0) {
-          const uploadResult = await FileService.uploadFiles(files, {
-            teacherName: authData.username || 'Teacher',
+          const { uploadSubmissionFileToSupabase } = await import('../helpers/uploadFile');
+
+          // Upload first file as main submission file
+          const uploadResult = await uploadSubmissionFileToSupabase({
+            file: files[0],
+            studentName: student.username || 'Student',
             className: foundClass.nameClass || 'Unknown_Class',
             exerciseTitle: exercise.title,
           });
@@ -793,10 +812,8 @@ export class ExerciseService {
             return { success: false, message: uploadResult.error };
           }
 
-          // For essay, we store the first file URL (main submission file)
-          if (uploadResult.attachments && uploadResult.attachments.length > 0) {
-            submissionContent.fileUrl = uploadResult.attachments[0].fileUrl;
-          }
+          submissionContent.fileUrl = uploadResult.fileUrl;
+          submissionContent.filePath = uploadResult.filePath;
         }
       } else if (exercise.type === 'multiple_choice') {
         // Multiple choice submission - require answers array
@@ -867,8 +884,12 @@ export class ExerciseService {
           };
         }
 
-        const uploadResult = await FileService.uploadFiles(files, {
-          teacherName: authData.username || 'Teacher',
+        const { uploadSubmissionFileToSupabase } = await import('../helpers/uploadFile');
+
+        // Upload first file as main submission file
+        const uploadResult = await uploadSubmissionFileToSupabase({
+          file: files[0],
+          studentName: student.username || 'Student',
           className: foundClass.nameClass || 'Unknown_Class',
           exerciseTitle: exercise.title,
         });
@@ -877,10 +898,8 @@ export class ExerciseService {
           return { success: false, message: uploadResult.error };
         }
 
-        // For file upload, store the main file URL
-        if (uploadResult.attachments && uploadResult.attachments.length > 0) {
-          submissionContent.fileUrl = uploadResult.attachments[0].fileUrl;
-        }
+        submissionContent.fileUrl = uploadResult.fileUrl;
+        submissionContent.filePath = uploadResult.filePath;
 
         // Optional content for file upload
         submissionContent.content = submissionData.content || '';
@@ -913,14 +932,17 @@ export class ExerciseService {
         submittedAt: submissionContent.submittedAt,
         content: submissionContent.content,
         fileUrl: submissionContent.fileUrl,
+        filePath: submissionContent.filePath,
         answers: submissionContent.answers,
         grade: submissionContent.grade,
         feedback: submissionContent.feedback,
       };
 
+      const submissionResponse = await FileService.withSignedSubmission(formattedSubmission);
+
       return {
         success: true,
-        submission: formattedSubmission,
+        submission: submissionResponse,
       };
     } catch (error) {
       console.error('Error in ExerciseService.studentSubmitExercise:', error);
@@ -1013,15 +1035,18 @@ export class ExerciseService {
         submittedAt: submission.submittedAt,
         content: submission.content,
         fileUrl: submission.fileUrl,
+        filePath: submission.filePath,
         answers: submission.answers,
         grade: submission.grade,
         feedback: submission.feedback,
         isLate: submission.submittedAt > exercise.dueDate,
       };
 
+      const submissionResponse = await FileService.withSignedSubmission(formattedSubmission);
+
       return {
         success: true,
-        submission: formattedSubmission,
+        submission: submissionResponse,
       };
     } catch (error) {
       console.error('Error in ExerciseService.getMySubmission:', error);
@@ -1147,6 +1172,7 @@ export class ExerciseService {
             feedback: submission.feedback,
             isLate: submission.submittedAt > exercise.dueDate,
             hasGrade: submission.grade !== undefined && submission.grade !== null,
+            filePath: submission.filePath,
             // Additional calculated fields
             isOverdue: new Date() > new Date(exercise.dueDate),
             daysSinceSubmission: Math.floor(
@@ -1214,6 +1240,7 @@ export class ExerciseService {
       const skip = (page - 1) * limit;
 
       const paginatedSubmissions = allSubmissions.slice(skip, skip + limit);
+      const submissionsResponse = await FileService.withSignedSubmissions(paginatedSubmissions);
 
       const pagination = {
         currentPage: page,
@@ -1224,7 +1251,7 @@ export class ExerciseService {
 
       return {
         success: true,
-        submissions: paginatedSubmissions,
+        submissions: submissionsResponse,
         pagination,
       };
     } catch (error) {
@@ -1378,12 +1405,15 @@ export class ExerciseService {
         submittedAt: submission.submittedAt,
         content: submission.content,
         fileUrl: submission.fileUrl,
+        filePath: submission.filePath,
         answers: submission.answers,
         grade: submission.grade,
         feedback: submission.feedback,
         isLate: submission.submittedAt > exercise.dueDate,
         hasGrade: submission.grade !== undefined && submission.grade !== null,
       }));
+
+      const signedSubmissions = await FileService.withSignedSubmissions(formattedSubmissions);
 
       // Calculate statistics
       const gradedSubmissions = exercise.submissions.filter(
@@ -1409,7 +1439,7 @@ export class ExerciseService {
 
       return {
         success: true,
-        submissions: formattedSubmissions,
+        submissions: signedSubmissions,
         pagination,
         statistics,
       };
@@ -1555,15 +1585,18 @@ export class ExerciseService {
         submittedAt: submission.submittedAt,
         content: submission.content,
         fileUrl: submission.fileUrl,
+        filePath: submission.filePath,
         answers: submission.answers,
         grade: submission.grade,
         feedback: submission.feedback,
         isLate: submission.submittedAt > exercise.dueDate,
       };
 
+      const submissionResponse = await FileService.withSignedSubmission(formattedSubmission);
+
       return {
         success: true,
-        submission: formattedSubmission,
+        submission: submissionResponse,
       };
     } catch (error) {
       console.error('Error in ExerciseService.gradeSubmission:', error);
@@ -1650,9 +1683,12 @@ export class ExerciseService {
       // If submission has a fileUrl, try to delete it from storage using helper
       if (submission.fileUrl) {
         try {
-          // deleteExerciseFileFromSupabase accepts a file URL
-          const { deleteExerciseFileFromSupabase } = await import('../helpers/uploadFile');
-          const deleted = await deleteExerciseFileFromSupabase(submission.fileUrl);
+          // deleteSubmissionFileFromSupabase accepts a file URL
+          const { deleteSubmissionFileFromSupabase } = await import('../helpers/uploadFile');
+          const fileIdentifier = submission.filePath || submission.fileUrl;
+          const deleted = fileIdentifier
+            ? await deleteSubmissionFileFromSupabase(fileIdentifier)
+            : true;
           if (!deleted) {
             console.warn('Failed to delete submission file from storage:', submission.fileUrl);
           }
@@ -1934,3 +1970,26 @@ export class ExerciseService {
     }
   }
 }
+
+const toPlainExerciseObject = (exerciseDoc: any) =>
+  exerciseDoc && typeof exerciseDoc.toObject === 'function' ? exerciseDoc.toObject() : exerciseDoc;
+
+const enrichExerciseDocument = async (exerciseDoc: any) => {
+  if (!exerciseDoc) {
+    return exerciseDoc;
+  }
+
+  const exercise = toPlainExerciseObject(exerciseDoc);
+  const attachmentsWithSigned = await FileService.withSignedAttachments(
+    (exercise.attachments as any[]) || [],
+  );
+  (exercise as any).attachments = attachmentsWithSigned;
+
+  if (exercise.submissions && exercise.submissions.length > 0) {
+    (exercise as any).submissions = await FileService.withSignedSubmissions(
+      exercise.submissions as any[],
+    );
+  }
+
+  return exercise;
+};

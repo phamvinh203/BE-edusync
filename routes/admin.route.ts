@@ -14,6 +14,13 @@ router.get(
   controller.getClassesByTeacher,
 );
 router.get('/all-teacher', authenticate, checkRole(['admin']), controller.getAllTeachers);
+router.get('/all-students', authenticate, checkRole(['admin']), controller.getAllStudents);
+router.get(
+  '/students/:studentId/classes',
+  authenticate,
+  checkRole(['admin']),
+  controller.getStudentClasses,
+);
 router.post('/create-class/:teacherId', authenticate, checkRole(['admin']), controller.createClass);
 
 export const adminRoutes: Router = router;

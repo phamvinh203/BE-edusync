@@ -17,6 +17,7 @@ const class_model_1 = __importDefault(require("../models/class.model"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const user_model_1 = __importDefault(require("../models/user.model"));
 const response_1 = require("../helpers/response");
+const generateJoinCode_1 = require("../helpers/generateJoinCode");
 const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { nameClass, subject, description, schedule, location, maxStudents, gradeLevel, pricePerSession, } = req.body;
@@ -47,8 +48,7 @@ const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             pricePerSession,
             teacherId: teacherUser._id,
             createdBy: user._id,
-            pendingStudents: [],
-            students: [],
+            classCode: (0, generateJoinCode_1.generateJoinCode)(8),
         });
         return res.status(201).json({
             message: 'Tạo lớp học thành công',
@@ -56,6 +56,7 @@ const createClass = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 _id: newClass._id,
                 nameClass: newClass.nameClass,
                 subject: newClass.subject,
+                type: newClass.type,
                 teacher: {
                     _id: teacherUser._id,
                     username: teacherUser.username,

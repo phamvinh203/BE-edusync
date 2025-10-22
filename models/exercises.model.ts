@@ -6,6 +6,7 @@ const SubmissionSchema = new mongoose.Schema(
     submittedAt: { type: Date, default: Date.now },
     content: { type: String }, // bài làm text
     fileUrl: { type: String }, // nếu có file đính kèm
+    filePath: { type: String }, // đường dẫn Supabase Storage
     answers: [{ type: Number }], // cho bài tập trắc nghiệm - mảng index đáp án
     grade: { type: Number, min: 0 }, // điểm số
     feedback: { type: String }, // nhận xét của giáo viên
@@ -35,6 +36,7 @@ const AttachmentSchema = new mongoose.Schema(
   {
     fileName: { type: String, required: true }, // Tên file gốc
     fileUrl: { type: String, required: true }, // URL file trên Supabase
+    filePath: { type: String }, // đường dẫn Supabase Storage
     fileSize: { type: Number }, // Kích thước file (bytes)
     mimeType: { type: String }, // Loại file
     uploadedAt: { type: Date, default: Date.now },

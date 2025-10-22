@@ -297,6 +297,7 @@ export const joinClass = async (req: Request, res: Response) => {
     const { id } = req.params;
     const user = req.user as any;
 
+    // tìm lớp học
     const foundClass = await ClassModel.findById(id);
     if (!foundClass) {
       return res.status(404).json({ message: 'Không tìm thấy lớp học' });
@@ -311,6 +312,24 @@ export const joinClass = async (req: Request, res: Response) => {
     // Kiểm tra nếu user là giáo viên của lớp này
     if (String(foundClass.teacherId) === String(currentUser._id)) {
       return res.status(400).json({ message: 'Bạn không thể đăng ký vào lớp do chính mình tạo' });
+    }
+
+    // Kiểm tra xem học sinh đã tham gia lớp nào của giáo viên này chưa
+    const existingClassWithTeacher = await ClassModel.findOne({
+      teacherId: foundClass.teacherId,
+      students: currentUser._id,
+      deleted: { $ne: true },
+    });
+
+    if (existingClassWithTeacher) {
+      return res.status(400).json({
+        message: 'Bạn đã tham gia lớp khác của giáo viên này nên không thể đăng ký thêm',
+        existingClass: {
+          _id: existingClassWithTeacher._id,
+          nameClass: existingClassWithTeacher.nameClass,
+          subject: existingClassWithTeacher.subject,
+        },
+      });
     }
 
     // Kiểm tra nếu học sinh đã tham gia lớp
@@ -994,5 +1013,3 @@ export const joinClassByCode = async (req: Request, res: Response) => {
     sendError(res, 500, 'Lỗi server khi tham gia lớp');
   }
 };
-
-
